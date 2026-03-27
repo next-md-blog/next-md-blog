@@ -1,6 +1,6 @@
 {
   "name": "@next-md-blog/core",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "A React library for parsing and displaying markdown blog posts in Next.js",
   "type": "module",
   "main": "dist/index.js",
