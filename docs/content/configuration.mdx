@@ -1,0 +1,74 @@
+---
+title: Configuration
+description: createConfig, loadConfig, getConfig, and the Config type for @next-md-blog/core.
+---
+
+# Configuration
+
+Blog-wide settings use the **`Config`** type and are usually created with **`createConfig`** in `next-md-blog.config.ts`. Pass that object as **`options.config`** to **`getBlogPost`**, **`getAllBlogPosts`**, and related SEO helpers so author resolution and URLs stay consistent.
+
+## `createConfig(partial: Config): Config`
+
+Merges your values with defaults and normalizes **`siteUrl`** (falls back to `process.env.NEXT_PUBLIC_SITE_URL` or `http://localhost:3000`).
+
+```tsx filename="next-md-blog.config.ts"
+import { createConfig } from '@next-md-blog/core';
+
+export default createConfig({
+  siteName: 'My Blog',
+  siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? 'https://example.com',
+  defaultAuthor: 'Default Author',
+  twitterHandle: '@site',
+  defaultLang: 'en',
+  defaultOgImage: 'https://example.com/og-default.png',
+  authors: [
+    {
+      name: 'Ada Lovelace',
+      url: 'https://example.com/ada',
+      twitter: '@ada',
+    },
+  ],
+  alternateLanguages: {
+    en: 'https://example.com/blog/my-post',
+    fr: 'https://example.com/fr/blog/my-post',
+  },
+  blogPostPathSegment: 'blog',
+  blogIndexPath: '/blogs',
+  organization: {
+    logo: 'https://example.com/logo.png',
+    sameAs: ['https://twitter.com/yoursite'],
+  },
+});
+```
+
+### `Config` fields
+
+| Field | Purpose |
+| --- | --- |
+| `siteName` | Site / brand name in metadata and schema |
+| `siteUrl` | Canonical origin for URLs in Open Graph, RSS, sitemap helpers |
+| `defaultAuthor` | Fallback when a post has no author in frontmatter |
+| `authors` | Rich **`Author[]`** used to resolve frontmatter names to bios, avatars, links |
+| `twitterHandle` | Site Twitter / X handle for card metadata |
+| `defaultOgImage` | Fallback image when a post has none |
+| `defaultLang` | Default language hint where applicable |
+| `alternateLanguages` | Map of locale → URL for `hreflang` (metadata + sitemap); per-post **`frontmatter.alternateLanguages`** overrides |
+| `blogPostPathSegment` | Path segment for default post URLs (default **`blog`**) when **`canonicalUrl`** is not set |
+| `blogIndexPath` | Blog listing path or absolute URL for default breadcrumbs and **`generateBlogListMetadata`** Open Graph URL (default **`{siteUrl}/blogs`**) |
+| `organization` | Optional **`SiteOrganization`**: **`id`**, **`legalName`**, **`description`**, **`logo`** (image URL), **`sameAs`** (profiles) for JSON-LD publisher |
+
+## `loadConfig()` and `getConfig()`
+
+Both return **default** configuration (env-based `siteUrl`, default site name, etc.). They do **not** read `next-md-blog.config.ts` from disk. In App Router apps, **import your config module** and pass it explicitly:
+
+```tsx
+import blogConfig from '@/next-md-blog.config';
+
+await getBlogPost(slug, { config: blogConfig });
+```
+
+Some internal helpers call **`getConfig()`** when no config is passed; for predictable SEO and authors, always pass your **`createConfig`** result from the app.
+
+## Environment variables
+
+- **`NEXT_PUBLIC_SITE_URL`** — Recommended in production for correct canonical and OG URLs when you use `createConfig` without a hardcoded `siteUrl`.

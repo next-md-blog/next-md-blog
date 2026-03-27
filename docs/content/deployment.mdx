@@ -1,0 +1,58 @@
+---
+title: Deployment
+description: Deploy the Nextra documentation site from the monorepo root with pnpm.
+---
+
+# Deployment
+
+## Documentation site (Nextra in `docs/`)
+
+The docs are a normal Next.js app at the **repository root** in the **`docs/`** directory. **`pnpm`** hoists dependencies from the **monorepo root**, so installs should run there even though the Next.js app lives in **`docs/`**.
+
+Clone the monorepo:
+
+```bash
+git clone https://github.com/next-md-blog/next-md-blog.git
+cd next-md-blog
+pnpm install
+pnpm build:docs   # or pnpm dev:docs for local preview
+```
+
+### Vercel (recommended layout)
+
+1. Create a project linked to this Git repository.
+2. Set **Root Directory** to the **repository root** (`.`).
+3. **Install Command:** `pnpm install` (default).
+4. **Build Command:** `pnpm --filter next-md-blog-docs run build`
+5. **Output directory:** leave default for Next.js; if the dashboard asks for the Next.js app directory, set it to **`docs`**, **or** keep the build command as:
+
+   ```bash
+   pnpm --filter next-md-blog-docs exec next build
+   ```
+
+   Vercel’s monorepo flow often detects this when you select the **`docs`** workspace. If you set **Root Directory** to **`docs`** instead of the repo root, use **Install Command** `cd .. && pnpm install` so the workspace lockfile at the root is used.
+
+6. Deploy. The documentation site is served at **[https://www.next-md-blog.com](https://www.next-md-blog.com)**.
+
+If anything fails, open Vercel’s build log: almost always either install ran in the wrong directory or the Next.js app directory was not **`docs`**.
+
+## Apps that consume `@next-md-blog/core`
+
+Deploy like any Next.js site. Set **`NEXT_PUBLIC_SITE_URL`** to the live origin in production so canonical and Open Graph URLs match your domain. Combine **`generateStaticParams`** with **`getAllBlogPosts`** for static post pages when appropriate.
+
+### One-click templates on Vercel
+
+Official **standalone** starters (flat repo, no monorepo) live in the main repository under **`templates/`** and are intended to be mirrored at:
+
+- [next-md-blog/template](https://github.com/next-md-blog/template) — single locale
+- [next-md-blog/template-i18n](https://github.com/next-md-blog/template-i18n) — i18n
+
+**Single locale**
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fnext-md-blog%2Fnext-md-blog%2Ftree%2Fmain%2Ftemplates%2Fsingle%2F)
+
+**i18n**
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fnext-md-blog%2Fnext-md-blog%2Ftree%2Fmain%2Ftemplates%2Fi18n)
+
+Import the linked repository in Vercel (or use the buttons above), keep the default Next.js build settings, then add **`NEXT_PUBLIC_SITE_URL`** for production. Each template includes a **`pnpm-workspace.yaml`** with a single package so **`pnpm install`** works whether the project is checked out alone or inside a larger checkout.

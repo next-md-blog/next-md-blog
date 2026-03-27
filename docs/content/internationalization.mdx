@@ -1,0 +1,50 @@
+---
+title: Internationalization
+description: Locale-specific post folders and getBlogPost / getAllBlogPosts locale option.
+---
+
+# Internationalization
+
+## Folder layout
+
+When **`GetBlogPostOptions.locale`** is set (e.g. `'en'`), the library resolves the posts directory to:
+
+```text
+{postsDir or posts}/{locale}/
+```
+
+For example, with default `posts` and `locale: 'fr'`, files are read from **`posts/fr/`**.
+
+The **`@next-md-blog/cli`** can scaffold **`/[locale]/blog/...`** routes and locale subfolders when you enable i18n; see [CLI reference](/cli).
+
+## API usage
+
+Pass the same **`locale`** for listing and detail routes:
+
+```tsx
+const posts = await getAllBlogPosts({ locale: 'en', config: blogConfig });
+const post = await getBlogPost('welcome', { locale: 'en', config: blogConfig });
+```
+
+**`getAllBlogPostSlugs`** delegates to **`getAllBlogPosts`**, so slugs are per locale directory.
+
+## Config hints
+
+- **`Config.defaultLang`** — default language code for site-level metadata.
+- **`Config.alternateLanguages`** — fallback hreflang map when a post has no **`frontmatter.alternateLanguages`** (usually too coarse for many posts; prefer frontmatter per file).
+
+## Sitemap and hreflang
+
+For **`/[locale]/blog/[slug]`**, each markdown file should set **`canonicalUrl`** (e.g. **`/en/blog/welcome`**) and **`alternateLanguages`** with every locale variant (relative paths are OK; they are resolved with **`siteUrl`** in metadata and sitemap).
+
+In **`app/sitemap.ts`**, load posts for **each locale** with **`getAllBlogPosts({ locale, config })`** and pass the combined list to **`getBlogSitemap`**. The CLI **`seo`** subcommand with **`--i18n-enabled`** and **`--locales`** scaffolds locale-aware **`sitemap.ts`** and **`feed.xml/route.ts`** code for you (see [CLI reference](/cli)). Pass **locale-aware **`breadcrumbs`** into **`BlogPostSEO`** so JSON-LD matches your routes.
+
+Routing (`generateStaticParams`, links) remains your app’s responsibility; the core package reads locale subfolders when **`options.locale`** is set.
+
+A hosted reference implementation is at **[demo.i18n.next-md-blog.com](https://demo.i18n.next-md-blog.com)** (see also [Demos](/demos)).
+
+**Deploy the i18n template on Vercel**
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fnext-md-blog%2Fnext-md-blog%2Ftree%2Fmain%2Ftemplates%2Fi18n)
+
+Single-locale starter: [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fnext-md-blog%2Fnext-md-blog%2Ftree%2Fmain%2Ftemplates%2Fsingle%2F)

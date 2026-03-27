@@ -1,0 +1,53 @@
+{
+  "name": "next-md-blog-monorepo",
+  "version": "1.0.1",
+  "private": true,
+  "description": "Monorepo for next-md-blog packages",
+  "workspaces": [
+    "packages/core",
+    "packages/cli",
+    "docs",
+    "demos/single",
+    "demos/i18n"
+  ],
+  "scripts": {
+    "build": "pnpm --filter './packages/*' --filter './docs' -r run build && pnpm --filter next-md-blog-demo --filter next-md-blog-demo-i18n run build",
+    "build:core": "pnpm --filter @next-md-blog/core run build",
+    "build:cli": "pnpm --filter @next-md-blog/cli run build",
+    "dev": "pnpm --filter './packages/*' --filter './docs' -r run dev",
+    "dev:core": "pnpm --filter @next-md-blog/core run dev",
+    "dev:cli": "pnpm --filter @next-md-blog/cli run dev",
+    "dev:docs": "pnpm --filter next-md-blog-docs run dev",
+    "dev:demo": "pnpm --filter next-md-blog-demo run dev",
+    "dev:demo:i18n": "pnpm --filter next-md-blog-demo-i18n run dev",
+    "build:docs": "pnpm --filter next-md-blog-docs run build",
+    "test": "pnpm --filter './packages/*' --filter './docs' -r run --if-present test",
+    "test:core": "pnpm --filter @next-md-blog/core run test",
+    "test:cli": "pnpm --filter @next-md-blog/cli run test",
+    "test:watch": "pnpm --filter './packages/*' --filter './docs' -r run --if-present test:watch",
+    "test:coverage": "pnpm --filter './packages/*' --filter './docs' -r run --if-present test:coverage",
+    "clean": "rm -rf node_modules",
+    "install:all": "pnpm install",
+    "lint": "eslint packages/cli packages/core && pnpm --filter next-md-blog-docs run lint && pnpm --filter next-md-blog-demo --filter next-md-blog-demo-i18n run lint",
+    "typecheck": "pnpm --filter './packages/*' --filter './docs' -r run typecheck",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "prepare": "pnpm --filter './packages/*' -r run build",
+    "sync:templates": "node scripts/sync-templates.mjs",
+    "update-org": "node scripts/update-org.js",
+    "publish:all": "bash scripts/publish.sh"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@10.33.0",
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.5",
+    "@eslint/js": "^9.39.4",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "globals": "^16.5.0",
+    "typescript-eslint": "^8.57.2"
+  }
+}

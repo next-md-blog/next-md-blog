@@ -1,0 +1,74 @@
+---
+title: CLI reference
+description: Flags and behavior for @next-md-blog/cli (parseArgs in packages/cli/src/args.ts).
+---
+
+# CLI reference
+
+Run the initializer with:
+
+```bash
+npx @next-md-blog/cli
+```
+
+Global install (optional):
+
+```bash
+npm i -g @next-md-blog/cli
+next-md-blog-init
+```
+
+## `seo` subcommand
+
+Add or refresh **only** App Router SEO routes (no blog pages, no installs):
+
+- **`app/sitemap.ts`** (or **`src/app/sitemap.ts`**) — blog URLs via **`getBlogSitemap`**
+- **`app/robots.ts`** — **`getBlogRobots`**
+- **`app/feed.xml/route.ts`** — RSS via **`createRssFeedResponse`**
+
+```bash
+npx @next-md-blog/cli seo --non-interactive --content-dir=posts
+```
+
+Use the same **`--content-dir`**, **`--i18n-enabled`**, **`--locales`**, and **`--locale-folder`** flags as full init so generated code matches **`next-md-blog.config.ts`**. Interactive mode asks only for content directory and i18n.
+
+## Modes
+
+- **Interactive** (default) — prompts for paths, routes, i18n, SEO, and feature toggles.
+- **Non-interactive** — pass **`--non-interactive`** or **`-y`**, or set **`CI=true`**. Combine with flags below. **`createNonInteractiveConfig`** merges CLI flags with defaults.
+
+## Flags
+
+Boolean flags use **`--flag`** to enable. Several features support **`--no-*`** to disable.
+
+| Flag | Effect |
+| --- | --- |
+| **`--non-interactive`**, **`-y`** | Skip prompts |
+| **`--force`**, **`-f`** | Overwrite existing **`sitemap.ts`**, **`robots.ts`**, and **`feed.xml/route.ts`** instead of skipping |
+| **`--content-dir=<path>`** or **`--content-dir <path>`** | Content directory (validated path segment) |
+| **`--blog-route=<name>`** | Dynamic segment for single post route |
+| **`--blogs-route=<name>`** | Listing route segment |
+| **`--i18n-enabled`** | Turns on i18n with defaults: `localeFolder: '[locale]'`, `locales: ['en','fr']` |
+| **`--locale-folder=<name>`** or **`--locale-folder <name>`** | Locale dynamic segment (implies i18n if not set yet) |
+| **`--locales=a,b,c`** or **`--locales <list>`** | Comma-separated locales (implies i18n) |
+| **`--example-post`** | Create example post |
+| **`--no-example-post`** | Skip example post |
+| **`--blog-pages`** | Generate blog pages |
+| **`--no-blog-pages`** | Skip page generation |
+| **`--og-image`** | Generate OG image route |
+| **`--no-og-image`** | Skip OG image |
+| **`--site-name`**, **`--site-url`**, **`--author`**, **`--twitter`** | SEO fields for generated config (supports `--key=value` or `--key value`) |
+
+Invalid values throw with a clear **`Error`** message.
+
+## After running
+
+The CLI typically:
+
+1. Writes **`next-md-blog.config.ts`** using **`createConfig`** from **`@next-md-blog/core`**.
+2. Creates the content directory and optional **`welcome.md`**.
+3. Generates App Router files under **`app/`** or **`src/app/`** (blog routes, optional OG image, **`sitemap.ts`**, **`robots.ts`**, **`feed.xml/route.ts`**). Pages Router templates exist for older setups when **`pages/`** is used instead.
+4. Runs **`npm install`** for **`@next-md-blog/core`**, **`@tailwindcss/typography`**, and optionally **`@vercel/og`**.
+5. Patches **`globals.css`** for the typography plugin and a dark variant when applicable.
+
+Exact file paths depend on your answers (routes, i18n, router type).

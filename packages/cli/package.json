@@ -1,0 +1,52 @@
+{
+  "name": "@next-md-blog/cli",
+  "version": "1.0.0",
+  "description": "CLI tool for initializing next-md-blog in your Next.js project",
+  "type": "module",
+  "main": "dist/cli.js",
+  "bin": {
+    "next-md-blog-init": "./dist/cli.js",
+    "@next-md-blog/cli-init": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "templates"
+  ],
+  "scripts": {
+    "lint": "pnpm -C ../.. exec eslint packages/cli",
+    "typecheck": "tsc --noEmit",
+    "build": "rm -rf dist && tsc && cp -r src/templates dist/templates",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "keywords": [
+    "nextjs",
+    "mdx",
+    "blog",
+    "cli",
+    "init"
+  ],
+  "author": "next-md-blog",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/next-md-blog/next-md-blog.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://www.next-md-blog.com",
+  "bugs": {
+    "url": "https://github.com/next-md-blog/next-md-blog/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@next-md-blog/core": "workspace:*",
+    "@types/node": "^22.19.15",
+    "@vitest/coverage-v8": "^4.1.2",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.2"
+  }
+}

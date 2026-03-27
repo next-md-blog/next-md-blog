@@ -1,0 +1,125 @@
+# Trusted publishing (OIDC): on npmjs.com → package @next-md-blog/core → Access →
+# Trusted Publishers → GitHub Actions. Workflow filename must match exactly (case-sensitive): publish-core.yml
+
+name: Publish @next-md-blog/core to npm
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/core/**'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version bump (patch, minor, major)'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+concurrency:
+  group: npm-publish-core-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish core
+    runs-on: ubuntu-latest
+    environment: next-md-blog/core
+    if: github.actor != 'github-actions[bot]'
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Ensure npm CLI for trusted publishing
+        run: npm install -g npm@^11.5.1
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump version (push to main)
+        if: github.event_name == 'push'
+        working-directory: packages/core
+        run: pnpm version patch --no-git-tag-version 2>/dev/null || true
+
+      - name: Bump version (workflow dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        working-directory: packages/core
+        run: npm version ${{ github.event.inputs.version }} --no-git-tag-version 2>/dev/null || true
+
+      - name: Refresh lockfile after version bump
+        run: pnpm install
+
+      - name: Lint
+        run: pnpm --filter @next-md-blog/core run lint
+
+      - name: Typecheck
+        run: pnpm --filter @next-md-blog/core run typecheck
+
+      - name: Test
+        run: pnpm run test:core
+
+      - name: Build
+        run: pnpm run build:core
+
+      - name: Publish to npm
+        working-directory: packages/core
+        run: |
+          set -euo pipefail
+          PKG='@next-md-blog/core'
+          LOCAL=$(node -p "require('./package.json').version")
+          REMOTE=$(npm view "$PKG" version 2>/dev/null || true)
+          if [ -z "$REMOTE" ] || [ "$REMOTE" != "$LOCAL" ]; then
+            pnpm publish --access public --no-git-checks --provenance
+          else
+            echo "Skip publish $PKG@$LOCAL (already on npm)"
+          fi
+
+      - name: Commit version bump and tag (push to main)
+        if: github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          CORE_VER=$(node -p "require('./packages/core/package.json').version")
+          git add packages/core/package.json pnpm-lock.yaml
+          if git diff --staged --quiet; then
+            echo "No version file changes to commit"
+          else
+            git commit -m "chore(release): bump @next-md-blog/core to v${CORE_VER}"
+            git tag -a "core-v${CORE_VER}" -m "Release @next-md-blog/core v${CORE_VER}"
+            git push origin "HEAD:${{ github.ref_name }}" --tags
+          fi
+
+      - name: Commit version bump and tag (workflow dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          set -euo pipefail
+          CORE_VER=$(node -p "require('./packages/core/package.json').version")
+          git add packages/core/package.json pnpm-lock.yaml
+          if git diff --staged --quiet; then
+            echo "No version file changes to commit"
+          else
+            git commit -m "chore: bump @next-md-blog/core to v${CORE_VER}"
+            git tag -a "core-v${CORE_VER}" -m "Release @next-md-blog/core v${CORE_VER}"
+            git push origin "HEAD:${{ github.ref_name }}" --tags
+          fi

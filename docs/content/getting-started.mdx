@@ -1,0 +1,128 @@
+---
+title: Getting started
+description: Install next-md-blog, run the CLI, and render your first post with the App Router.
+---
+
+# Getting started
+
+## Deploy a starter on Vercel
+
+Full Next.js apps with shadcn-style UI (npm **`@next-md-blog/core`**). Set **`NEXT_PUBLIC_SITE_URL`** after the first deploy. More detail: [Deployment](/deployment#one-click-templates-on-vercel).
+
+**Single locale**
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fnext-md-blog%2Fnext-md-blog%2Ftree%2Fmain%2Ftemplates%2Fsingle%2F)
+
+**i18n**
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fnext-md-blog%2Fnext-md-blog%2Ftree%2Fmain%2Ftemplates%2Fi18n)
+
+## 1. Install the core library
+
+```bash
+npm install @next-md-blog/core
+# or
+pnpm add @next-md-blog/core
+```
+
+Peer dependencies (`next`, `react`, `react-dom`) should already be present in your Next.js app.
+
+## 2. Scaffold with the CLI (recommended)
+
+From your Next.js project root:
+
+```bash
+npx @next-md-blog/cli
+```
+
+When blog page generation is enabled, the CLI can create a `posts/` directory, example markdown, `next-md-blog.config.ts`, and App Router pages under routes you choose (defaults: `/blog/[slug]` and `/blogs`). It also writes **`sitemap.ts`**, **`robots.ts`**, and **`feed.xml/route.ts`** (RSS) next to your App Router root—either **`app/`** or **`src/app/`**. It installs `@tailwindcss/typography` and adjusts `globals.css`, and can add an `opengraph-image` route.
+
+Non-interactive example:
+
+```bash
+npx @next-md-blog/cli --non-interactive \
+  --content-dir=posts \
+  --blog-route=blog \
+  --blogs-route=blogs \
+  --site-name="My Blog" \
+  --site-url="https://example.com" \
+  --author="Ada Lovelace" \
+  --twitter="@ada"
+```
+
+Full flag list: [CLI reference](/cli).
+
+**SEO files only** (no new blog pages or installs)—for example after upgrading the CLI or if you skipped pages on first run:
+
+```bash
+npx @next-md-blog/cli seo --non-interactive --content-dir=posts
+```
+
+Use the same **`--content-dir`**, **`--i18n-enabled`**, **`--locales`**, and **`--locale-folder`** flags as a full init so the generated code matches your project. **`--force`** overwrites existing sitemap, robots, and feed files. Details: [CLI reference](/cli).
+
+## 3. Manual minimal setup
+
+1. Add **`next-md-blog.config.ts`** at the project root:
+
+```tsx filename="next-md-blog.config.ts"
+import { createConfig } from '@next-md-blog/core';
+
+export default createConfig({
+  siteName: 'My Blog',
+  siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000',
+  defaultAuthor: 'You',
+  twitterHandle: '@you',
+  defaultLang: 'en',
+});
+```
+
+2. Put markdown files in **`posts/`** (or another directory; pass `postsDir` in options).
+
+3. Add a dynamic route that loads a post. Use **async `params`** (Next.js 16 App Router):
+
+```tsx filename="app/blog/[slug]/page.tsx"
+import {
+  getBlogPost,
+  getAllBlogPosts,
+  generateBlogPostMetadata,
+  MarkdownContent,
+} from '@next-md-blog/core';
+import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
+import blogConfig from '@/next-md-blog.config';
+
+export async function generateStaticParams() {
+  const posts = await getAllBlogPosts({ config: blogConfig });
+  return posts.map((post) => ({ slug: post.slug }));
+}
+
+export async function generateMetadata(props: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await props.params;
+  const post = await getBlogPost(slug, { config: blogConfig });
+  if (!post) return { title: 'Not found' };
+  return generateBlogPostMetadata(post, blogConfig);
+}
+
+export default async function Page(props: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await props.params;
+  const post = await getBlogPost(slug, { config: blogConfig });
+  if (!post) notFound();
+
+  return (
+    <article className="prose dark:prose-invert max-w-none">
+      <h1>{post.frontmatter.title ?? post.slug}</h1>
+      <MarkdownContent content={post.content} />
+    </article>
+  );
+}
+```
+
+4. Wrap rendered markdown in **`prose`** classes from **`@tailwindcss/typography`** for readable typography (the CLI can wire this up).
+
+## 4. Styling
+
+The library does not ship a global stylesheet for article body text. Use Tailwind Typography (`prose`, `dark:prose-invert`) or your own CSS. See [Configuration](/configuration) for config-related author and URL fields used in SEO.

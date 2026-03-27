@@ -1,0 +1,58 @@
+---
+title: SEO & feeds
+description: Metadata, JSON-LD, Next.js sitemap/robots, RSS, hreflang, and URL helpers.
+---
+
+# SEO & feeds
+
+## Next.js metadata files (recommended)
+
+The **`@next-md-blog/cli`** can generate these three files for you on a full init (when blog pages are enabled), or anytime via the **`seo`** subcommand—use **`--force`** to overwrite existing files. Paths are under **`app/`** or **`src/app/`**, whichever exists in your project.
+
+You can also add them by hand. Use Next.js **[metadata file conventions](https://nextjs.org/docs/app/api-reference/file-conventions/metadata)** so **`/sitemap.xml`** and **`/robots.txt`** are served automatically.
+
+- **`app/sitemap.ts`** (or **`src/app/sitemap.ts`**) — `export default async function sitemap()` returning **`getBlogSitemap(posts, blogConfig)`** from **`@next-md-blog/core/next`** (or the same export from **`@next-md-blog/core`**).
+- **`app/robots.ts`** — `export default function robots()` returning **`getBlogRobots(blogConfig)`**.
+- **`app/feed.xml/route.ts`** — RSS; use **`createRssFeedResponse(validPosts, blogConfig)`** from **`@next-md-blog/core/next`** instead of hand-rolling headers (the CLI scaffolds this route by default).
+
+Merge static routes with blog URLs in **`sitemap.ts`** if needed (spread or **`concat`** arrays).
+
+## Next.js page metadata
+
+- **`generateBlogPostMetadata(post, config?)`** — title, description, Open Graph, Twitter cards, robots from frontmatter, **`alternates.languages`** from **`frontmatter.alternateLanguages`** (per-post) or **`config.alternateLanguages`**, with relative URLs resolved against **`siteUrl`**.
+- **`generateBlogListMetadata(posts, config?)`** — listing metadata; Open Graph URL uses **`config.blogIndexPath`** or **`{siteUrl}/blogs`**.
+
+Pass your **`createConfig`** result as **`config`** everywhere.
+
+## JSON-LD
+
+- **`generateBlogPostSchema(post, config?, options?)`** — **`BlogPosting`** (or `frontmatter.type`) with authors, dates, **publisher `Organization`** (stable **`@id`**, optional **`config.organization`** logo / **`sameAs`** / legal name), word count, and **`timeRequired`**.
+- **`generateOrganizationSchema(config?)`** — standalone **`Organization`** script for **`layout.tsx`** (same **`@id`** as the article publisher when **`siteUrl`** matches).
+- **`generateBlogPostSchemaGraph(...)`** — one **`@graph`** payload (Organization + article with publisher by **`@id`** + breadcrumbs).
+- **`generateBreadcrumbsSchema`** — default trail: **Home** → **Blog** (**`blogIndexPath`** or **`{siteUrl}/blogs`**) → post. Override with **`breadcrumbs`** or **`BlogPostSEO`**.
+- **`BlogPostSEO`** — set **`asGraph`** for a single **`@graph`** script instead of two separate tags.
+
+Render with **`BlogPostSEO`** or serialize into **`<script type="application/ld+json">`**.
+
+## Hreflang and sitemap alternates
+
+- **`frontmatter.alternateLanguages`** — per-post **`Record<string, string>`** (hreflang code → URL). Overrides **`config.alternateLanguages`** for that post. Relative values are expanded with **`siteUrl`** in metadata and sitemap output.
+- **`getBlogSitemapEntries`** / **`getBlogSitemap`** set **`alternates.languages`** for Next’s sitemap format (Next serializes hreflang in **`/sitemap.xml`**).
+
+For **multi-locale routes** (e.g. **`/[locale]/blog/[slug]`**), use **per-post** **`canonicalUrl`** and **`alternateLanguages`** (see [Internationalization](/internationalization)) and aggregate all locale posts in **`sitemap.ts`**.
+
+## RSS
+
+- **`generateRSSFeed(posts, config?)`** — RSS 2.0 XML string; capped by **`RSS_POST_LIMIT`** (20). Prefer **`createRssFeedResponse(posts, config?)`** from **`@next-md-blog/core/next`** in **`app/feed.xml/route.ts`**.
+
+### URL configuration
+
+| Mechanism | Role |
+| --- | --- |
+| **`canonicalUrl`** (frontmatter) | Canonical post URL for metadata, JSON-LD, RSS, sitemap |
+| **`config.blogPostPathSegment`** | Default segment instead of **`blog`** when **`canonicalUrl`** is omitted |
+| **`config.blogIndexPath`** | Blog listing URL for default breadcrumbs and list metadata |
+
+## Security and plugins
+
+Custom **`rehype`/`remark`** plugins in **`MarkdownContent`** can change HTML output. Prefer well-maintained plugins and review output for user-controlled markdown.

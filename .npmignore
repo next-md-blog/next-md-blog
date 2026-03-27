@@ -1,0 +1,29 @@
+# Source files
+package/
+src/
+tsconfig.json
+tsconfig.cli.json
+vitest.config.ts
+
+# Examples and test projects
+demos/
+test/
+
+# Development documentation
+ARCHITECTURE.md
+CLEAN_CODE_REVIEW.md
+.github/CONTRIBUTING.md
+contributing/
+
+# Git and system files
+.gitignore
+.git/
+*.log
+.DS_Store
+
+# Dependencies
+node_modules/
+
+# Build artifacts (keep dist/ as it's needed)
+# dist/ is intentionally NOT ignored as it contains the published code
+

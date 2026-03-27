@@ -1,0 +1,62 @@
+---
+title: Testing & contributing
+description: Run Vitest in the monorepo and contribute to next-md-blog.
+---
+
+# Testing & contributing
+
+## Full CI-style check
+
+From the **repository root** (same steps as [GitHub Actions CI](https://github.com/next-md-blog/next-md-blog/blob/main/.github/workflows/ci.yml)):
+
+```bash
+git clone https://github.com/next-md-blog/next-md-blog.git
+cd next-md-blog
+pnpm install --frozen-lockfile   # optional; use pnpm install locally
+pnpm check    # lint + typecheck + test + pnpm build
+```
+
+**`pnpm check`** is the single gate before a PR: it runs **`pnpm lint`**, **`pnpm typecheck`**, **`pnpm test`**, then **`pnpm build`**.
+
+## Running tests
+
+```bash
+pnpm install
+pnpm test
+```
+
+**`pnpm test`** runs **Vitest** in **`packages/core`** and **`packages/cli`** only. The docs app has no `test` script. Integration tests in **`packages/cli`** use a minimal Next.js fixture; **`packages/core`** has broader unit coverage.
+
+Target one package:
+
+```bash
+pnpm test:core
+pnpm test:cli
+```
+
+Watch mode and coverage (where configured):
+
+```bash
+pnpm test:watch
+pnpm test:coverage
+```
+
+## Lint and typecheck
+
+- **`pnpm lint`** — ESLint on **`packages/cli`**, **`packages/core`**, **`docs/`**, and both **demo** apps (`demos/single`, `demos/i18n`).
+- **`pnpm typecheck`** — **`tsc --noEmit`** for **`packages/*`** and **`docs/`** only. Demos are type-checked as part of their **Next.js production build** in **`pnpm build`**, not as a separate workspace `typecheck` task.
+
+## Building the monorepo
+
+Root **`pnpm install`** runs **`prepare`**, which builds **`packages/*`** but **not** **`docs/`** or demos (keeps installs fast).
+
+- **`pnpm build`** — builds **`packages/*`**, **`docs/`**, and **both demo apps** (matches CI).
+- **`pnpm build:docs`** — documentation site only.
+
+```bash
+pnpm run build
+```
+
+## Contributing
+
+Guidelines and workflow: **[`.github/CONTRIBUTING.md`](https://github.com/next-md-blog/next-md-blog/blob/main/.github/CONTRIBUTING.md)** in the GitHub repository. Prefer focused PRs that match existing style in **`packages/core`** and **`packages/cli`**.

@@ -1,0 +1,57 @@
+---
+title: Content & frontmatter
+description: Post files, supported extensions, directory layout, and frontmatter fields.
+---
+
+# Content & frontmatter
+
+## Files and location
+
+- Posts live under a directory at the project root, default name **`posts`** (constant **`POSTS_DIR_NAME`**).
+- Supported extensions: **`.md`** and **`.mdx`**.
+- The **slug** is the filename without extension (e.g. `hello-world.md` → slug `hello-world`).
+
+Override the directory with **`GetBlogPostOptions.postsDir`** (path relative to `process.cwd()` is resolved inside **`getPostsDirectory`**).
+
+## Frontmatter (`BlogPostFrontmatter`)
+
+Parsed with [gray-matter](https://github.com/jonschlinkert/gray-matter). Known fields:
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `title` | `string` | Display / SEO title |
+| `date` | `string` | Used for sorting lists (newest first) and dates in metadata |
+| `description` | `string` | Meta description |
+| `author` | `string`, object with `name`, or array of those | Normalized with config `authors` |
+| `authors` | Array of strings or `{ name }` objects | Same normalization |
+| `tags` | `string[]` | Keywords / article tags |
+| `ogImage` | `string` | Custom Open Graph image URL |
+| `image` | `string` | Featured image; fallback for OG |
+| `robots` | `string` | Robots meta directive |
+| `noindex` | `boolean` | SEO helper flags |
+| `nofollow` | `boolean` | SEO helper flags |
+| `readingTime` | `number` | Minutes; if omitted, computed from body |
+| `schema` | `object` | Merged into generated JSON-LD (see below) |
+
+Additional keys are allowed (`[key: string]: unknown`) and remain on **`frontmatter`**.
+
+### SEO-related frontmatter aliases
+
+Metadata and schema resolution also look at optional aliases such as **`seoTitle`**, **`seoDescription`**, **`excerpt`**, **`publishedDate`**, **`modifiedDate`**, **`canonicalUrl`**, **`category`**, **`lang`**, **`imageAlt`**, and **`type`** (Schema.org `@type`, default `BlogPosting`). These are read in **`seo-metadata`**, **`seo-schema`**, and feed helpers where applicable.
+
+### Custom JSON-LD merge
+
+If **`frontmatter.schema`** is a plain object, **`generateBlogPostSchema`** merges it on top of the generated **`BlogPosting`** object so you can add or override fields.
+
+## `BlogPost` vs `BlogPostMetadata`
+
+- **`BlogPost`** — full document: `slug`, `content`, `frontmatter`, **`readingTime`**, **`wordCount`**, **`authors`** (normalized).
+- **`BlogPostMetadata`** — listing shape: `slug`, `frontmatter`, **`authors`** (no `content`).
+
+**`getAllBlogPosts`** returns **`BlogPostMetadata[]`**, sorted by `frontmatter.date` descending (string compare).
+
+## Markdown rendering
+
+**`MarkdownContent`** uses **`react-markdown`** with **GFM** and **emoji** remark plugins by default. Pass **`remarkPlugins`** / **`rehypePlugins`** only from trusted packages; custom plugins can change HTML output and security characteristics.
+
+**`defaultMarkdownComponents`** exports the default element map used by **`MarkdownContent`**; you can merge overrides via the **`components`** prop.

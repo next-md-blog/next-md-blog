@@ -1,0 +1,114 @@
+---
+title: API reference
+description: Public exports from @next-md-blog/core and @next-md-blog/core/next.
+---
+
+# API reference
+
+Most symbols are exported from **`@next-md-blog/core`**. **App Router metadata file** helpers (`getBlogSitemap`, `getBlogRobots`, `createRssFeedResponse`) are also available from **`@next-md-blog/core/next`** (and re-exported from the main package). Types are TypeScript-only where noted.
+
+## Components
+
+### `MarkdownContent`
+
+Server-friendly markdown renderer (uses **`react-markdown`**).
+
+**Props (`MarkdownContentProps`):**
+
+- **`content`** — `string` (required)
+- **`className`** — optional wrapper class
+- **`components`** — partial **`MarkdownComponents`** map (extends `react-markdown` **`Components`**)
+- **`remarkPlugins`** / **`rehypePlugins`** — optional plugin arrays
+
+### `defaultMarkdownComponents`
+
+Default markdown element components used by **`MarkdownContent`**. Spread or merge when overriding individual tags.
+
+### `OgImage`
+
+Layout helper for Open Graph images (intended for use with **`@vercel/og`** / **`ImageResponse`**).
+
+**Props (`OgImageProps`):** `title` (required), optional `description`, `siteName`, `backgroundColor`, `textColor`, `width`, `height`.
+
+### `BlogPostSEO`
+
+Injects **JSON-LD** **`<script type="application/ld+json">`** tags for a post: article schema plus optional breadcrumbs.
+
+**Props (`BlogPostSEOProps`):**
+
+- **`post`** — **`BlogPost`** (required)
+- **`config`** — **`Config`** (optional; falls back to **`getConfig()`**)
+- **`breadcrumbs`** — optional `{ name, url }[]` for **`generateBreadcrumbsSchema`**
+- **`includeBreadcrumbs`** — default `true`
+- **`asGraph`** — when `true`, emits one **`@graph`** script (Organization + **`BlogPosting`** + **`BreadcrumbList`**) with publisher by **`@id`**
+
+## Data loading
+
+### `getBlogPost(slug, options?)`
+
+Returns **`Promise<BlogPost | null>`**. Resolves `.md` then `.mdx` under the posts directory. Uses **`options.config`** when parsing authors. Throws **`FileReadError`** / validation errors; **`BlogPostNotFoundError`** can surface from parse path in edge cases.
+
+**`GetBlogPostOptions`:** `postsDir?`, `locale?`, `config?`.
+
+### `getAllBlogPosts(options?)`
+
+Returns **`Promise<BlogPostMetadata[]>`** sorted by `frontmatter.date` descending. Skips invalid files with a console warning. Returns **`[]`** if the directory is missing or unreadable in safe cases.
+
+### `getAllBlogPostSlugs(options?)`
+
+Returns **`Promise<string[]>`** of slugs from **`getAllBlogPosts`**.
+
+## Configuration helpers
+
+- **`createConfig(config: Config): Config`** — user-facing merge + `siteUrl` normalization.
+- **`loadConfig(): Promise<Config>`** — async defaults only.
+- **`getConfig(): Config`** — sync defaults only.
+
+Prefer importing your **`next-md-blog.config.ts`** and passing **`config`** into loaders and SEO functions.
+
+## SEO and feeds
+
+- **`generateBlogPostMetadata(post, config?)`** — Next **`Metadata`** for a post (hreflang from **`frontmatter.alternateLanguages`** or **`config.alternateLanguages`**; relative URLs are resolved with **`siteUrl`**).
+- **`generateBlogListMetadata(posts, config?)`** — **`Metadata`** for an index page (Open Graph URL uses **`blogIndexPath`** or default **`{siteUrl}/blogs`**).
+- **`generateBlogPostSchema(post, config?, options?)`** — Schema.org **`BlogPosting`** JSON-LD; optional **`BlogPostSchemaOptions.publisherReference`** for **`@graph`** usage.
+- **`generateBlogPostSchemaGraph(post, config?, breadcrumbs?, includeBreadcrumbs?)`** — single **`@context` + `@graph`** object.
+- **`generateBreadcrumbsSchema(post, config?, breadcrumbs?)`** — **`BreadcrumbList`** JSON-LD (default blog link uses **`blogIndexPath`** or **`{siteUrl}/blogs`**).
+- **`generateOrganizationSchema(config?)`** — standalone **`Organization`** JSON-LD (for root layout), including **`@id`**, optional **`organization.logo`**, **`sameAs`**, etc.
+- **`getBlogSitemapEntries(posts, config?)`** — array of sitemap rows (same shape as Next **`MetadataRoute.Sitemap`** entries).
+- **`generateRSSFeed(posts, config?)`** — RSS 2.0 XML string (usually consumed via **`createRssFeedResponse`**).
+
+### `@next-md-blog/core/next` (and main re-exports)
+
+- **`getBlogSitemap(posts, config?)`** — typed for **`app/sitemap.ts`** (**`MetadataRoute.Sitemap`**).
+- **`getBlogRobots(config?)`** — typed for **`app/robots.ts`** (**`MetadataRoute.Robots`**).
+- **`createRssFeedResponse(posts, config?, init?)`** — **`NextResponse`** for **`app/feed.xml/route.ts`**.
+
+See [SEO & feeds](/seo-and-feeds).
+
+## Utilities
+
+- **`calculateReadingTime(content: string): number`**
+- **`calculateWordCount(content: string): number`**
+- **`normalizeAuthors(author?, authors?, configAuthors?)`** — returns **`(string | Author)[]`**, resolving frontmatter `author` / `authors` against optional **`config.authors`**.
+- **`resolvePostUrl`**, **`resolvePostUrlWithConfig`**, **`getBlogPostPathSegment`**, **`resolveHreflangMap`**, **`resolveBlogIndexUrl`**, **`resolveCanonicalUrl`**, **`escapeXml`** — URL and feed helpers used by SEO generators.
+
+## Constants
+
+- **`POSTS_DIR_NAME`** — `'posts'`.
+- **`getPostsDirectory(customPath?, locale?)`** — absolute path under **`process.cwd()`**.
+
+## Errors
+
+**`MdxBlogError`** — base class (`code: string`). Import it to catch any library error by prototype.
+
+- **`BlogPostNotFoundError`**
+- **`FileReadError`** — `filePath`, optional `originalError`, `context`
+- **`DirectoryError`**
+
+## Types
+
+Exported types: **`BlogPost`**, **`BlogPostMetadata`**, **`BlogPostFrontmatter`**, **`GetBlogPostOptions`**, **`Author`**, **`Config`**, **`SiteOrganization`**, **`BlogPostSchemaOptions`**, **`BlogSitemapEntry`**.
+
+### `Author`
+
+`name` (required); optional `email`, `bio`, `avatar`, `twitter`, `github`, `url`.

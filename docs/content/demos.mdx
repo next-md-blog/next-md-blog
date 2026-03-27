@@ -1,0 +1,59 @@
+---
+title: Demos
+description: Official Next.js demo apps in the next-md-blog repository.
+---
+
+# Demos
+
+The monorepo ships two runnable demo apps under **`demos/`**.
+
+```bash
+git clone https://github.com/next-md-blog/next-md-blog.git
+cd next-md-blog
+pnpm install
+```
+
+From the **repository root** (after a workspace **`pnpm install`**), you can run **`pnpm dev:demo`** (single locale, port **5102**) or **`pnpm dev:demo:i18n`** (port **5103**) instead of **`cd`** into each folder. A root **`pnpm build`** also production-builds both demos (same as CI).
+
+## Single locale
+
+**[`demos/single`](https://github.com/next-md-blog/next-md-blog/tree/main/demos/single)** — one locale, App Router, typography, and theme toggle patterns. Hosted at **[demo.next-md-blog.com](https://demo.next-md-blog.com)**.
+
+```bash
+cd demos/single
+pnpm install   # or npm install
+pnpm dev       # or npm run dev
+```
+
+> **Note:** In this monorepo, demos depend on **`@next-md-blog/core`** via **`workspace:*`**. Published apps should use **`@next-md-blog/core`** and **`@next-md-blog/cli`** from npm as documented elsewhere on this site.
+
+## i18n
+
+**[`demos/i18n`](https://github.com/next-md-blog/next-md-blog/tree/main/demos/i18n)** — locale segment, translated post folders, and a language switcher. Hosted at **[demo.i18n.next-md-blog.com](https://demo.i18n.next-md-blog.com)**.
+
+Source for both: [github.com/next-md-blog/next-md-blog](https://github.com/next-md-blog/next-md-blog).
+
+```bash
+cd demos/i18n
+pnpm install
+pnpm dev
+```
+
+Use these as references for **`locale`** in **`getBlogPost`** / **`getAllBlogPosts`** and for routing structure alongside [Internationalization](/internationalization).
+
+## Vercel templates (standalone)
+
+To deploy **without cloning this monorepo**, use the flat apps in **`templates/`** (published as separate GitHub repositories with **`@next-md-blog/core`** from npm):
+
+- **Single locale:** [github.com/next-md-blog/template](https://github.com/next-md-blog/template)
+- **i18n:** [github.com/next-md-blog/template-i18n](https://github.com/next-md-blog/template-i18n)
+
+**Single locale**
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fnext-md-blog%2Fnext-md-blog%2Ftree%2Fmain%2Ftemplates%2Fsingle%2F)
+
+**i18n**
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fnext-md-blog%2Fnext-md-blog%2Ftree%2Fmain%2Ftemplates%2Fi18n)
+
+After the first deploy, set **`NEXT_PUBLIC_SITE_URL`** to your production URL. Source trees are synced from **`demos/single`** and **`demos/i18n`** via **`pnpm sync:templates`** in this repository (see **`templates/README.md`**).
