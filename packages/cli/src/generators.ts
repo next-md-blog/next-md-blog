@@ -1,321 +1,226 @@
 import type { CLIConfig } from './types.js';
 import { loadTemplate } from './templates.js';
 
-/**
- * Build options parameter string for function calls
- * @param contentDir - Content directory name
- * @param i18nEnabled - Whether i18n is enabled
- * @returns Options parameter string
- */
-function buildOptionsParam(contentDir: string, i18nEnabled: boolean): string {
-  const parts: string[] = [];
-  if (contentDir !== 'posts') {
-    parts.push('postsDir: POSTS_DIR');
+/** Locales literal used in generated `next-md-blog.config.ts`. */
+function buildLocalesLiteral(config: CLIConfig): string {
+  if (!config.i18n.enabled || config.i18n.locales.length === 0) {
+    return "['en'] as const";
   }
-  if (i18nEnabled) {
-    parts.push('locale');
-  }
-  parts.push('config: blogConfig');
-  return `{ ${parts.join(', ')} }`;
+  return `[${config.i18n.locales.map((l) => `'${l}'`).join(', ')}] as const`;
 }
 
-/**
- * Build posts directory option constant
- * @param contentDir - Content directory name
- * @returns Posts directory option string or empty string
- */
-function buildPostsDirOption(contentDir: string): string {
-  return contentDir !== 'posts' ? `\nconst POSTS_DIR = '${contentDir}';` : '';
-}
+// ---------------------------------------------------------------------------
+// App Router templates
+// ---------------------------------------------------------------------------
 
 /**
- * Generate blog page component code
- * @param config - CLI configuration
- * @returns Generated blog page code
+ * Generate `app/[blogRoute]/[slug]/page.tsx`.
  */
 export function generateBlogPage(config: CLIConfig): string {
-  const { contentDir, i18n, blogsRoute } = config;
-  const postsDirOption = buildPostsDirOption(contentDir);
-  const postsDirParam = buildOptionsParam(contentDir, i18n.enabled);
-  const postsDirParamFunc = `, ${postsDirParam}`;
-  
-  const localeParam = i18n.enabled ? ', locale: string' : '';
-  const localeExtract = i18n.enabled ? '  const { slug, locale } = resolvedParams;' : '  const { slug } = resolvedParams;';
-  
-  // Generate generateStaticParams code based on i18n
-  const localesArray = i18n.enabled && i18n.locales.length > 0 
-    ? i18n.locales.map(locale => `'${locale}'`).join(', ')
-    : "'en'";
-  
-  const generateStaticParamsPostsDirParam = buildOptionsParam(contentDir, i18n.enabled);
-  
-  const generateStaticParamsCode = i18n.enabled
-    ? `  // Supported locales
-    const locales = [${localesArray}];
-    
-    const allParams: Array<{ slug: string; locale: string }> = [];
-    for (const locale of locales) {
-      const posts = await getAllBlogPosts(${generateStaticParamsPostsDirParam});
-      for (const post of posts) {
-        allParams.push({ slug: post.slug, locale });
-      }
-    }
-    return allParams;`
-    : `  const posts = await getAllBlogPosts(${postsDirParam});
-  return posts.map((post) => ({
-    slug: post.slug,
-  }));`;
+  const { i18n, blogsRoute } = config;
 
+  const paramsType = i18n.enabled
+    ? '{ slug: string; locale: string }'
+    : '{ slug: string }';
+  const localeExtract = i18n.enabled
+    ? '  const { slug, locale } = resolvedParams;'
+    : '  const { slug } = resolvedParams;';
+  const getOpts = i18n.enabled ? '{ locale }' : '';
+  const metadataCall = i18n.enabled
+    ? 'blog.metadata(post, { locale })'
+    : 'blog.metadata(post)';
   const backToListHrefAttr = i18n.enabled
-    ? 'href={`/${locale}/' + blogsRoute + '`}`'
-    : `href={\`/${blogsRoute}\`}`;
+    ? 'href={`/${locale}/' + blogsRoute + '`}'
+    : `href="/${blogsRoute}"`;
+  const generateStaticParamsCode = i18n.enabled
+    ? `  const allParams: Array<{ slug: string; locale: string }> = [];
+  for (const locale of LOCALES) {
+    const posts = await blog.getAll({ locale });
+    for (const post of posts) {
+      allParams.push({ slug: post.slug, locale });
+    }
+  }
+  return allParams;`
+    : `  const posts = await blog.getAll();
+  return posts.map((post) => ({ slug: post.slug }));`;
+
+  const localesImport = i18n.enabled
+    ? "import { blog, LOCALES } from '@/next-md-blog.config';"
+    : "import { blog } from '@/next-md-blog.config';";
 
   return loadTemplate('blog-page.tsx', {
-    POSTS_DIR_OPTION: postsDirOption,
-    POSTS_DIR_PARAM: postsDirParam,
-    POSTS_DIR_PARAM_FUNC: postsDirParamFunc,
-    LOCALE_PARAM: localeParam,
+    LOCALES_IMPORT: localesImport,
+    PARAMS_TYPE: paramsType,
     LOCALE_EXTRACT: localeExtract,
+    GET_OPTS: getOpts,
+    METADATA_CALL: metadataCall,
     GENERATE_STATIC_PARAMS: generateStaticParamsCode,
     BACK_TO_LIST_HREF_ATTR: backToListHrefAttr,
   });
 }
 
 /**
- * Generate blogs listing page component code
- * @param config - CLI configuration
- * @returns Generated blogs page code
+ * Generate `app/[blogsRoute]/page.tsx`.
  */
 export function generateBlogsPage(config: CLIConfig): string {
-  const { blogRoute, contentDir, i18n } = config;
-  const postsDirOption = buildPostsDirOption(contentDir);
-  const postsDirParam = buildOptionsParam(contentDir, i18n.enabled);
-  
-  const localeParam = i18n.enabled ? 'locale: string' : '';
-  const localeExtract = i18n.enabled ? '  const { locale } = resolvedParams;' : '';
-  const paramsType = i18n.enabled ? '{ locale: string }' : 'Record<string, never>';
+  const { blogRoute, i18n } = config;
 
+  const paramsType = i18n.enabled
+    ? '{ locale: string }'
+    : 'Record<string, never>';
+  const localeExtract = i18n.enabled
+    ? '  const { locale } = resolvedParams;'
+    : '';
+  const getOpts = i18n.enabled ? '{ locale }' : '';
+  const listMetadataCall = i18n.enabled
+    ? 'blog.listMetadata(posts, { locale })'
+    : 'blog.listMetadata(posts)';
   const postLinkHrefAttr = i18n.enabled
-    ? 'href={`/${locale}/' + blogRoute + '/${post.slug}`}`'
+    ? 'href={`/${locale}/' + blogRoute + '/${post.slug}`}'
     : `href={\`/${blogRoute}/\${post.slug}\`}`;
 
   return loadTemplate('blogs-page.tsx', {
-    POSTS_DIR_OPTION: postsDirOption,
-    POSTS_DIR_PARAM: postsDirParam,
-    LOCALE_PARAM: localeParam,
-    LOCALE_EXTRACT: localeExtract,
     PARAMS_TYPE: paramsType,
-    BLOG_ROUTE: blogRoute,
+    LOCALE_EXTRACT: localeExtract,
+    GET_OPTS: getOpts,
+    LIST_METADATA_CALL: listMetadataCall,
     POST_LINK_HREF_ATTR: postLinkHrefAttr,
-    CONTENT_DIR: contentDir,
   });
 }
 
 /**
- * Generate OG image component code
- * @param config - CLI configuration
- * @returns Generated OG image code
+ * Generate `app/[blogRoute]/[slug]/opengraph-image.tsx`.
  */
 export function generateOgImage(config: CLIConfig): string {
-  const { seoConfig, contentDir, i18n } = config;
-  const postsDirOption = buildPostsDirOption(contentDir);
-  const postsDirParam = `, ${buildOptionsParam(contentDir, i18n.enabled)}`;
-  
-  const localeParam = i18n.enabled ? ', locale: string' : '';
-  const localeExtract = i18n.enabled ? '  const { slug, locale } = resolvedParams;' : '  const { slug } = resolvedParams;';
+  const { i18n } = config;
+  const paramsType = i18n.enabled
+    ? '{ slug: string; locale: string }'
+    : '{ slug: string }';
+  const localeExtract = i18n.enabled
+    ? '  const { slug, locale } = await params;'
+    : '  const { slug } = await params;';
+  const getOpts = i18n.enabled ? '{ locale }' : '';
 
   return loadTemplate('opengraph-image.tsx', {
-    POSTS_DIR_OPTION: postsDirOption,
-    POSTS_DIR_PARAM: postsDirParam,
-    LOCALE_PARAM: localeParam,
+    PARAMS_TYPE: paramsType,
     LOCALE_EXTRACT: localeExtract,
-    SITE_NAME: seoConfig.siteName,
+    GET_OPTS: getOpts,
   });
 }
 
-/**
- * Generate Pages Router blog page component code
- * @param config - CLI configuration
- * @returns Generated Pages Router blog page code
- */
-export function generatePagesRouterBlogPage(config: CLIConfig): string {
-  const { contentDir } = config;
-  const postsDirOption = buildPostsDirOption(contentDir);
-  const postsDirParam = contentDir !== 'posts' 
-    ? '{ postsDir: POSTS_DIR, config: blogConfig }'
-    : '{ config: blogConfig }';
-  const postsDirParamFunc = contentDir !== 'posts' 
-    ? ', { postsDir: POSTS_DIR, config: blogConfig }'
-    : ', { config: blogConfig }';
+// ---------------------------------------------------------------------------
+// Pages Router templates (no i18n)
+// ---------------------------------------------------------------------------
 
-  return loadTemplate('pages-router-blog-page.tsx', {
-    POSTS_DIR_OPTION: postsDirOption,
-    POSTS_DIR_PARAM: postsDirParam,
-    POSTS_DIR_PARAM_FUNC: postsDirParamFunc,
-  });
+export function generatePagesRouterBlogPage(_config: CLIConfig): string {
+  return loadTemplate('pages-router-blog-page.tsx', {});
 }
 
-/**
- * Generate Pages Router blogs listing page component code
- * @param config - CLI configuration
- * @returns Generated Pages Router blogs page code
- */
 export function generatePagesRouterBlogsPage(config: CLIConfig): string {
-  const { blogRoute, contentDir } = config;
-  const postsDirOption = buildPostsDirOption(contentDir);
-  const postsDirParam = contentDir !== 'posts' 
-    ? '{ postsDir: POSTS_DIR, config: blogConfig }'
-    : '{ config: blogConfig }';
-
   return loadTemplate('pages-router-blogs-page.tsx', {
-    POSTS_DIR_OPTION: postsDirOption,
-    POSTS_DIR_PARAM: postsDirParam,
-    BLOG_ROUTE: blogRoute,
+    BLOG_ROUTE: config.blogRoute,
   });
 }
 
+// ---------------------------------------------------------------------------
+// Config + SEO file generators
+// ---------------------------------------------------------------------------
+
 /**
- * Generate next-md-blog config file content
- * @param config - CLI configuration
- * @returns Config file content
+ * Generate `next-md-blog.config.ts` — exports `site` + one `blog` collection
+ * (plus a `LOCALES` constant when i18n is enabled).
  */
 export function generateConfigFile(config: CLIConfig): string {
-  const { seoConfig, i18n } = config;
-  const defaultLang = i18n.enabled && i18n.locales.length > 0 ? i18n.locales[0] : 'en';
-  
-  return `import { createConfig } from '@next-md-blog/core';
+  const { seoConfig, i18n, contentDir, blogRoute, blogsRoute } = config;
+  const defaultLang =
+    i18n.enabled && i18n.locales.length > 0 ? i18n.locales[0] : 'en';
+  const twitterLine = seoConfig.twitterHandle
+    ? `  twitterHandle: '${seoConfig.twitterHandle}',`
+    : '  // twitterHandle: undefined,';
+  const localesBlock = i18n.enabled
+    ? `\nexport const LOCALES = ${buildLocalesLiteral(config)};\n`
+    : '';
 
-export default createConfig({
+  return `import { defineSite, defineCollection } from '@next-md-blog/core';
+
+export const site = defineSite({
   siteName: '${seoConfig.siteName}',
   siteUrl: process.env.NEXT_PUBLIC_SITE_URL || '${seoConfig.siteUrl}',
   defaultAuthor: '${seoConfig.defaultAuthor}',
-${seoConfig.twitterHandle ? `  twitterHandle: '${seoConfig.twitterHandle}',` : '  // twitterHandle: undefined,'}
+${twitterLine}
   defaultLang: '${defaultLang}',
-  // OG images are automatically generated via opengraph-image.tsx file convention
-  // defaultOgImage: 'https://example.com/default-og.jpg',
   // Rich publisher JSON-LD (optional):
   // organization: { logo: 'https://example.com/logo.png', sameAs: ['https://twitter.com/yourhandle'] },
 });
+${localesBlock}
+export const blog = defineCollection({
+  id: 'blog',
+  contentDir: '${contentDir}',
+  pathSegment: '${blogRoute}',
+  indexPath: '/${blogsRoute}',
+  site,
+});
+
+// Default export kept for tooling that imports a single config module.
+export default site;
 `;
 }
 
 /**
- * Generate app/sitemap.ts for MetadataRoute sitemap
+ * Generate `app/sitemap.ts` — uses `composeSitemap` across every collection.
  */
 export function generateAppSitemap(config: CLIConfig): string {
-  const { contentDir, i18n } = config;
-  const postsDirConst =
-    contentDir !== 'posts' ? `const POSTS_DIR = '${contentDir}';\n` : '';
+  const { i18n } = config;
+  const localesImport = i18n.enabled
+    ? "import { blog, LOCALES } from '@/next-md-blog.config';"
+    : `import { blog, site } from '@/next-md-blog.config';
 
-  const noLocaleOpts =
-    contentDir !== 'posts'
-      ? '{ config: blogConfig, postsDir: POSTS_DIR }'
-      : '{ config: blogConfig }';
+const LOCALES = [site.defaultLang ?? 'en'] as const;`;
 
-  const body =
-    i18n.enabled && i18n.locales.length > 0
-      ? `const locales = [${i18n.locales.map((l) => `'${l}'`).join(', ')}] as const;
-  const allPosts = [];
-  for (const locale of locales) {
-    const posts = await getAllBlogPosts(${
-      contentDir !== 'posts'
-        ? '{ locale, config: blogConfig, postsDir: POSTS_DIR }'
-        : '{ locale, config: blogConfig }'
-    });
-    allPosts.push(...posts);
-  }
-  return getBlogSitemap(allPosts, blogConfig);`
-      : `const posts = await getAllBlogPosts(${noLocaleOpts});
-  return getBlogSitemap(posts, blogConfig);`;
+  return `import { composeSitemap } from '@next-md-blog/core';
+${localesImport}
 
-  return `import { getAllBlogPosts } from '@next-md-blog/core';
-import { getBlogSitemap } from '@next-md-blog/core/next';
-import blogConfig from '@/next-md-blog.config';
-${postsDirConst}
 export default async function sitemap() {
-  ${body}
+  return composeSitemap({
+    collections: [blog],
+    locales: LOCALES,
+  });
 }
 `;
 }
 
 /**
- * Generate app/robots.ts for MetadataRoute robots
+ * Generate `app/robots.ts`.
  */
 export function generateAppRobots(): string {
-  return `import { getBlogRobots } from '@next-md-blog/core/next';
-import blogConfig from '@/next-md-blog.config';
+  return `import { getRobots } from '@next-md-blog/core/next';
+import { site } from '@/next-md-blog.config';
 
 export default function robots() {
-  return getBlogRobots(blogConfig);
+  return getRobots(site);
 }
 `;
 }
 
 /**
- * Generate app/feed.xml/route.ts for RSS (latest posts).
+ * Generate `app/feed.xml/route.ts` — delegates to `blog.rssResponse`.
  */
 export function generateAppFeedRoute(config: CLIConfig): string {
-  const { contentDir, i18n } = config;
-  const postsDirConst =
-    contentDir !== 'posts' ? `const POSTS_DIR = '${contentDir}';\n` : '';
+  const { i18n } = config;
+  if (!i18n.enabled) {
+    return `import { blog } from '@/next-md-blog.config';
 
-  const getOptsNoLocale =
-    contentDir !== 'posts'
-      ? '{ config: blogConfig, postsDir: POSTS_DIR }'
-      : '{ config: blogConfig }';
-
-  const getPostOptsNoLocale =
-    contentDir !== 'posts'
-      ? '{ config: blogConfig, postsDir: POSTS_DIR }'
-      : '{ config: blogConfig }';
-
-  const body = i18n.enabled && i18n.locales.length > 0
-    ? `const locales = [${i18n.locales.map((l) => `'${l}'`).join(', ')}] as const;
-  type Entry = { slug: string; locale: string; date: string };
-  const entries: Entry[] = [];
-  for (const locale of locales) {
-    const list = await getAllBlogPosts(${
-      contentDir !== 'posts'
-        ? '{ locale, config: blogConfig, postsDir: POSTS_DIR }'
-        : '{ locale, config: blogConfig }'
-    });
-    for (const p of list) {
-      const date =
-        p.frontmatter?.date != null && typeof p.frontmatter.date === 'string'
-          ? p.frontmatter.date
-          : '';
-      entries.push({ slug: p.slug, locale, date });
-    }
-  }
-  entries.sort((a, b) => b.date.localeCompare(a.date));
-  const top = entries.slice(0, 20);
-  const posts = await Promise.all(
-    top.map(({ slug, locale }) =>
-      getBlogPost(slug, ${
-        contentDir !== 'posts'
-          ? '{ locale, config: blogConfig, postsDir: POSTS_DIR }'
-          : '{ locale, config: blogConfig }'
-      })
-    )
-  );
-  const validPosts = posts.filter((post): post is NonNullable<typeof post> => post !== null);
-  return createRssFeedResponse(validPosts, blogConfig);`
-    : `const postsMetadata = await getAllBlogPosts(${getOptsNoLocale});
-  const posts = await Promise.all(
-    postsMetadata.slice(0, 20).map(async (postMeta) =>
-      getBlogPost(postMeta.slug, ${getPostOptsNoLocale})
-    )
-  );
-  const validPosts = posts.filter((post): post is NonNullable<typeof post> => post !== null);
-  return createRssFeedResponse(validPosts, blogConfig);`;
-
-  return `import { getAllBlogPosts, getBlogPost } from '@next-md-blog/core';
-import { createRssFeedResponse } from '@next-md-blog/core/next';
-import blogConfig from '@/next-md-blog.config';
-${postsDirConst}
 export async function GET() {
-  ${body}
+  return blog.rssResponse();
+}
+`;
+  }
+  // For i18n, ship one default-locale feed at /feed.xml. Add /[locale]/feed.xml
+  // routes manually if you want per-locale feeds.
+  return `import { blog, site } from '@/next-md-blog.config';
+
+export async function GET() {
+  return blog.rssResponse({ locale: site.defaultLang });
 }
 `;
 }
-

@@ -7,7 +7,7 @@ import { Cards } from 'nextra/components'
 
 # next-md-blog
 
-**Markdown-first blogging for [Next.js](https://nextjs.org)**. Keep posts as `.md` / `.mdx` on disk, load them in Server Components with **`getBlogPost`** / **`getAllBlogPosts`**, render with **`MarkdownContent`**, and ship **metadata**, **JSON-LD**, **RSS**, and **sitemap** helpers — plus an optional **CLI** to scaffold routes, config, **sitemap / robots / RSS** routes, and a dedicated **`seo`** subcommand to refresh those files.
+**Markdown-first content for [Next.js](https://nextjs.org)**. Keep posts as `.md` / `.mdx` on disk. Declare any number of **collections** (blog, glossary, docs, changelog…) via **`defineCollection`**, render with **`MarkdownContent`**, and ship **metadata**, **JSON-LD**, **RSS**, **sitemap**, and **llms.txt** helpers — plus an optional **CLI** to scaffold routes, config, and **`sitemap / robots / RSS`** files.
 
 <Cards>
   <Cards.Card title="Getting started" href="/getting-started" arrow />
@@ -37,7 +37,7 @@ flowchart LR
     RSC["Server Component page"]
     CORE["@next-md-blog/core"]
     MDX["MarkdownContent"]
-    SEO["BlogPostSEO / Metadata"]
+    SEO["collection.metadata + schemaGraph"]
   end
   MD --> CORE
   CFG --> CORE
@@ -101,7 +101,7 @@ See the full **[Comparison](/comparison)** page for stack-by-stack notes.
 
 - [Getting started](/getting-started) — install, CLI, first routes
 - [CLI reference](/cli) — flags, **`seo`** subcommand, **`--force`**
-- [Configuration](/configuration) — `createConfig` and site settings
+- [Configuration](/configuration) — `defineSite`, `defineCollection`, and site settings
 - [Content & frontmatter](/content-and-frontmatter) — fields and conventions
 - [Internationalization](/internationalization) — locale segments and folders
 

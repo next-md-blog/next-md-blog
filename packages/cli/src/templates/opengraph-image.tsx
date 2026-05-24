@@ -1,29 +1,21 @@
 import { ImageResponse } from 'next/og';
-import { getBlogPost } from '@next-md-blog/core';
-import blogConfig from '@/next-md-blog.config';
-{{POSTS_DIR_OPTION}}
-// Image metadata
-export const alt = 'Blog Post';
-export const size = {
-  width: 1200,
-  height: 630,
-};
+import { blog, site } from '@/next-md-blog.config';
 
+export const alt = 'Blog Post';
+export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
-// Image generation
 export default async function Image({
   params,
 }: {
-  params: Promise<{ slug: string{{LOCALE_PARAM}} }>;
+  params: Promise<{{PARAMS_TYPE}}>;
 }) {
-  const resolvedParams = await params;
 {{LOCALE_EXTRACT}}
-  const post = await getBlogPost(slug{{POSTS_DIR_PARAM}});
+  const post = await blog.getOne(slug{{GET_OPTS}});
 
-  const title = post?.frontmatter.title || 'Blog Post';
-  const description = post?.frontmatter.description || '';
-  const siteName = '{{SITE_NAME}}';
+  const title = (post?.frontmatter.title as string) || 'Blog Post';
+  const description = (post?.frontmatter.description as string) || '';
+  const siteName = site.siteName;
 
   return new ImageResponse(
     (
@@ -97,8 +89,6 @@ export default async function Image({
         </div>
       </div>
     ),
-    {
-      ...size,
-    }
+    { ...size }
   );
 }

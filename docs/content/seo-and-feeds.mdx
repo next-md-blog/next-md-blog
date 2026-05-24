@@ -1,58 +1,148 @@
 ---
 title: SEO & feeds
-description: Metadata, JSON-LD, Next.js sitemap/robots, RSS, hreflang, and URL helpers.
+description: Per-collection metadata, JSON-LD, sitemap, RSS, llms.txt, plus site-wide composition.
 ---
 
 # SEO & feeds
 
-## Next.js metadata files (recommended)
+Every SEO surface in v1.2 lives on the `Collection` object you got back from `defineCollection`. Site-wide aggregation (sitemap, llms.txt) is done with `composeSitemap` / `composeLlmsTxt`.
 
-The **`@next-md-blog/cli`** can generate these three files for you on a full init (when blog pages are enabled), or anytime via the **`seo`** subcommand—use **`--force`** to overwrite existing files. Paths are under **`app/`** or **`src/app/`**, whichever exists in your project.
+## Per-page metadata
 
-You can also add them by hand. Use Next.js **[metadata file conventions](https://nextjs.org/docs/app/api-reference/file-conventions/metadata)** so **`/sitemap.xml`** and **`/robots.txt`** are served automatically.
+```tsx
+// app/blog/[slug]/page.tsx
+import { blog } from '@/next-md-blog.config';
 
-- **`app/sitemap.ts`** (or **`src/app/sitemap.ts`**) — `export default async function sitemap()` returning **`getBlogSitemap(posts, blogConfig)`** from **`@next-md-blog/core/next`** (or the same export from **`@next-md-blog/core`**).
-- **`app/robots.ts`** — `export default function robots()` returning **`getBlogRobots(blogConfig)`**.
-- **`app/feed.xml/route.ts`** — RSS; use **`createRssFeedResponse(validPosts, blogConfig)`** from **`@next-md-blog/core/next`** instead of hand-rolling headers (the CLI scaffolds this route by default).
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const post = await blog.getOne(slug);
+  if (!post) return { title: 'Not found' };
+  return blog.metadata(post);
+}
+```
 
-Merge static routes with blog URLs in **`sitemap.ts`** if needed (spread or **`concat`** arrays).
+`metadata()` populates `<title>` (using `defaults.titleTemplate` or `opts.titleTemplate`), description, canonical, `openGraph`, `twitter`, robots, hreflang (`alternates.languages`), and author / keyword metadata.
 
-## Next.js page metadata
+For app/[lang] routing, pass `locale` and pre-compute hreflang siblings:
 
-- **`generateBlogPostMetadata(post, config?)`** — title, description, Open Graph, Twitter cards, robots from frontmatter, **`alternates.languages`** from **`frontmatter.alternateLanguages`** (per-post) or **`config.alternateLanguages`**, with relative URLs resolved against **`siteUrl`**.
-- **`generateBlogListMetadata(posts, config?)`** — listing metadata; Open Graph URL uses **`config.blogIndexPath`** or **`{siteUrl}/blogs`**.
-
-Pass your **`createConfig`** result as **`config`** everywhere.
+```tsx
+const alternateLanguages = await blog.hreflangMap(slug, LOCALES);
+return blog.metadata(post, { locale, titleTemplate: 'absolute', alternateLanguages });
+```
 
 ## JSON-LD
 
-- **`generateBlogPostSchema(post, config?, options?)`** — **`BlogPosting`** (or `frontmatter.type`) with authors, dates, **publisher `Organization`** (stable **`@id`**, optional **`config.organization`** logo / **`sameAs`** / legal name), word count, and **`timeRequired`**.
-- **`generateOrganizationSchema(config?)`** — standalone **`Organization`** script for **`layout.tsx`** (same **`@id`** as the article publisher when **`siteUrl`** matches).
-- **`generateBlogPostSchemaGraph(...)`** — one **`@graph`** payload (Organization + article with publisher by **`@id`** + breadcrumbs).
-- **`generateBreadcrumbsSchema`** — default trail: **Home** → **Blog** (**`blogIndexPath`** or **`{siteUrl}/blogs`**) → post. Override with **`breadcrumbs`** or **`BlogPostSEO`**.
-- **`BlogPostSEO`** — set **`asGraph`** for a single **`@graph`** script instead of two separate tags.
+```tsx
+const jsonLd = blog.schemaGraph(post, undefined, { locale, speakable: true });
+// → { "@context": ..., "@graph": [Organization, BlogPosting, BreadcrumbList] }
+```
 
-Render with **`BlogPostSEO`** or serialize into **`<script type="application/ld+json">`**.
+- `schemaGraph(doc, breadcrumbs?, opts?)` returns the combined `@graph` with `Organization`, the doc schema, and `BreadcrumbList`.
+- `schema(doc, opts?)` returns just the doc schema (no Organization or breadcrumbs).
+- `breadcrumbsSchema(doc, breadcrumbs?, opts?)` returns just the `BreadcrumbList`.
+- Pass `opts.extend` to mutate the doc node freely.
 
-## Hreflang and sitemap alternates
+Inline a sanitized `<script type="application/ld+json">` yourself:
 
-- **`frontmatter.alternateLanguages`** — per-post **`Record<string, string>`** (hreflang code → URL). Overrides **`config.alternateLanguages`** for that post. Relative values are expanded with **`siteUrl`** in metadata and sitemap output.
-- **`getBlogSitemapEntries`** / **`getBlogSitemap`** set **`alternates.languages`** for Next’s sitemap format (Next serializes hreflang in **`/sitemap.xml`**).
+```tsx
+<script
+  type="application/ld+json"
+  dangerouslySetInnerHTML={{
+    __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c').replace(/&/g, '\\u0026'),
+  }}
+/>
+```
 
-For **multi-locale routes** (e.g. **`/[locale]/blog/[slug]`**), use **per-post** **`canonicalUrl`** and **`alternateLanguages`** (see [Internationalization](/internationalization)) and aggregate all locale posts in **`sitemap.ts`**.
+## Sitemap
+
+```ts filename="app/sitemap.ts"
+import { composeSitemap } from '@next-md-blog/core';
+import { blog, glossary, site } from '@/next-md-blog.config';
+
+const LOCALES = [site.defaultLang ?? 'en'] as const;
+
+export default async function sitemap() {
+  return composeSitemap({
+    collections: [blog, glossary],
+    locales: LOCALES,
+    staticEntries: [{ url: `${site.siteUrl}/${LOCALES[0]}`, lastModified: new Date(), priority: 1 }],
+  });
+}
+```
+
+Each row includes `xhtml:link rel="alternate" hreflang="…"` for every locale that has a translation, plus `x-default`. `lastModified` uses `max(frontmatter.date, frontmatter.updated)`.
+
+## Robots
+
+```ts filename="app/robots.ts"
+import { getRobots } from '@next-md-blog/core/next';
+import { site } from '@/next-md-blog.config';
+
+export default () => getRobots(site);
+```
 
 ## RSS
 
-- **`generateRSSFeed(posts, config?)`** — RSS 2.0 XML string; capped by **`RSS_POST_LIMIT`** (20). Prefer **`createRssFeedResponse(posts, config?)`** from **`@next-md-blog/core/next`** in **`app/feed.xml/route.ts`**.
+```ts filename="app/feed.xml/route.ts"
+import { blog } from '@/next-md-blog.config';
 
-### URL configuration
+export async function GET() {
+  return blog.rssResponse();
+}
+```
 
-| Mechanism | Role |
-| --- | --- |
-| **`canonicalUrl`** (frontmatter) | Canonical post URL for metadata, JSON-LD, RSS, sitemap |
-| **`config.blogPostPathSegment`** | Default segment instead of **`blog`** when **`canonicalUrl`** is omitted |
-| **`config.blogIndexPath`** | Blog listing URL for default breadcrumbs and list metadata |
+Per-locale feeds at `/[lang]/feed.xml`:
 
-## Security and plugins
+```ts filename="app/[lang]/feed.xml/route.ts"
+import { blog, LOCALES } from '@/next-md-blog.config';
 
-Custom **`rehype`/`remark`** plugins in **`MarkdownContent`** can change HTML output. Prefer well-maintained plugins and review output for user-controlled markdown.
+export async function generateStaticParams() {
+  return LOCALES.map((lang) => ({ lang }));
+}
+
+export async function GET(_req: Request, { params }: { params: Promise<{ lang: string }> }) {
+  const { lang } = await params;
+  return blog.rssResponse({ locale: lang });
+}
+```
+
+`rssResponse` sets `Content-Type` and `Cache-Control: public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400` by default.
+
+## llms.txt + llms-full.txt
+
+```ts filename="app/llms.txt/route.ts"
+import { composeLlmsTxt } from '@next-md-blog/core';
+import { blog, glossary, site, LOCALES } from '@/next-md-blog.config';
+
+export async function GET() {
+  const body = await composeLlmsTxt({
+    site,
+    collections: [blog, glossary],
+    locales: LOCALES,
+  });
+  return new Response(body, { headers: { 'content-type': 'text/plain; charset=utf-8' } });
+}
+```
+
+The same shape works for `composeLlmsFullTxt` (concatenated post bodies).
+
+## Hreflang
+
+When a post has the same slug across multiple locales, use `getInAllLocales` (or its convenience wrapper `hreflangMap`) to build the `alternateLanguages` map for `metadata()`.
+
+Per-post overrides via `frontmatter.alternateLanguages` (a `Record<hreflang, url>`) win over what `hreflangMap` computes.
+
+## Per-locale RSS link tags
+
+In your layout's metadata:
+
+```ts
+alternates: {
+  types: {
+    'application/rss+xml': [
+      { url: `/${lang}/feed.xml`, title: `${site.siteName} — ${lang}` },
+      ...OTHER_LOCALES.map((l) => ({ url: `/${l}/feed.xml`, title: `${site.siteName} — ${l}` })),
+    ],
+  },
+},
+```
