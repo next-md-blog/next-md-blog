@@ -1,4 +1,3 @@
-import { getAllBlogPosts, generateBlogListMetadata } from '@next-md-blog/core';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { Button } from '@/components/ui/button';
@@ -6,21 +5,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ThemeToggle } from '@/components/theme-toggle';
 import { DocsLink } from '@/components/docs-link';
 import { Calendar, User, ArrowRight, Clock } from 'lucide-react';
-import blogConfig from '@/next-md-blog.config';
+import { blog } from '@/next-md-blog.config';
 
-/**
- * Generate SEO metadata for the blogs listing page
- */
 export async function generateMetadata(): Promise<Metadata> {
-  const posts = await getAllBlogPosts({ config: blogConfig });
-  return generateBlogListMetadata(posts);
+  const posts = await blog.getAll();
+  return blog.listMetadata(posts);
 }
 
-/**
- * Blogs listing page
- */
 export default async function BlogsPage() {
-  const posts = await getAllBlogPosts({ config: blogConfig });
+  const posts = await blog.getAll();
 
   return (
     <div className="min-h-screen">

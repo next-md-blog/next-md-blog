@@ -22,9 +22,9 @@ next-md-blog-init
 
 Add or refresh **only** App Router SEO routes (no blog pages, no installs):
 
-- **`app/sitemap.ts`** (or **`src/app/sitemap.ts`**) — blog URLs via **`getBlogSitemap`**
-- **`app/robots.ts`** — **`getBlogRobots`**
-- **`app/feed.xml/route.ts`** — RSS via **`createRssFeedResponse`**
+- **`app/sitemap.ts`** (or **`src/app/sitemap.ts`**) — every collection via **`composeSitemap`**
+- **`app/robots.ts`** — **`getRobots(site)`**
+- **`app/feed.xml/route.ts`** — RSS via **`blog.rssResponse()`**
 
 ```bash
 npx @next-md-blog/cli seo --non-interactive --content-dir=posts
@@ -65,7 +65,7 @@ Invalid values throw with a clear **`Error`** message.
 
 The CLI typically:
 
-1. Writes **`next-md-blog.config.ts`** using **`createConfig`** from **`@next-md-blog/core`**.
+1. Writes **`next-md-blog.config.ts`** with **`defineSite`** + **`defineCollection`** from **`@next-md-blog/core`**. Add more collections (glossary, docs…) by calling **`defineCollection`** again.
 2. Creates the content directory and optional **`welcome.md`**.
 3. Generates App Router files under **`app/`** or **`src/app/`** (blog routes, optional OG image, **`sitemap.ts`**, **`robots.ts`**, **`feed.xml/route.ts`**). Pages Router templates exist for older setups when **`pages/`** is used instead.
 4. Runs **`npm install`** for **`@next-md-blog/core`**, **`@tailwindcss/typography`**, and optionally **`@vercel/og`**.

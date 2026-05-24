@@ -1,128 +1,127 @@
 ---
 title: Getting started
-description: Install next-md-blog, run the CLI, and render your first post with the App Router.
+description: Install next-md-blog, define a collection, and render your first post with the App Router.
 ---
 
 # Getting started
 
-## Deploy a starter on Vercel
+`@next-md-blog/core` v1.2 is organized around **collections**. A collection owns one content surface (blog, glossary, docs, changelog, …) with its own folder, URL segment, schema type, and RSS feed. A single shared **`SiteConfig`** holds site-wide concerns (name, URL, Organization JSON-LD).
 
-Full Next.js apps with shadcn-style UI (npm **`@next-md-blog/core`**). Set **`NEXT_PUBLIC_SITE_URL`** after the first deploy. More detail: [Deployment](/deployment#one-click-templates-on-vercel).
-
-**Single locale**
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fnext-md-blog%2Fnext-md-blog%2Ftree%2Fmain%2Ftemplates%2Fsingle%2F)
-
-**i18n**
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fnext-md-blog%2Fnext-md-blog%2Ftree%2Fmain%2Ftemplates%2Fi18n)
-
-## 1. Install the core library
+## Install
 
 ```bash
 npm install @next-md-blog/core
-# or
-pnpm add @next-md-blog/core
-```
-
-Peer dependencies (`next`, `react`, `react-dom`) should already be present in your Next.js app.
-
-## 2. Scaffold with the CLI (recommended)
-
-From your Next.js project root:
-
-```bash
+# (CLI for scaffolding routes and SEO files)
 npx @next-md-blog/cli
 ```
 
-When blog page generation is enabled, the CLI can create a `posts/` directory, example markdown, `next-md-blog.config.ts`, and App Router pages under routes you choose (defaults: `/blog/[slug]` and `/blogs`). It also writes **`sitemap.ts`**, **`robots.ts`**, and **`feed.xml/route.ts`** (RSS) next to your App Router root—either **`app/`** or **`src/app/`**. It installs `@tailwindcss/typography` and adjusts `globals.css`, and can add an `opengraph-image` route.
+## Define your site + collections
 
-Non-interactive example:
+```ts filename="next-md-blog.config.ts"
+import { defineSite, defineCollection } from '@next-md-blog/core';
 
-```bash
-npx @next-md-blog/cli --non-interactive \
-  --content-dir=posts \
-  --blog-route=blog \
-  --blogs-route=blogs \
-  --site-name="My Blog" \
-  --site-url="https://example.com" \
-  --author="Ada Lovelace" \
-  --twitter="@ada"
-```
-
-Full flag list: [CLI reference](/cli).
-
-**SEO files only** (no new blog pages or installs)—for example after upgrading the CLI or if you skipped pages on first run:
-
-```bash
-npx @next-md-blog/cli seo --non-interactive --content-dir=posts
-```
-
-Use the same **`--content-dir`**, **`--i18n-enabled`**, **`--locales`**, and **`--locale-folder`** flags as a full init so the generated code matches your project. **`--force`** overwrites existing sitemap, robots, and feed files. Details: [CLI reference](/cli).
-
-## 3. Manual minimal setup
-
-1. Add **`next-md-blog.config.ts`** at the project root:
-
-```tsx filename="next-md-blog.config.ts"
-import { createConfig } from '@next-md-blog/core';
-
-export default createConfig({
-  siteName: 'My Blog',
-  siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000',
-  defaultAuthor: 'You',
-  twitterHandle: '@you',
+export const site = defineSite({
+  siteName: 'Acme',
+  siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? 'https://acme.example',
+  defaultAuthor: 'Acme Team',
   defaultLang: 'en',
+});
+
+// One collection per content surface. Coexist freely.
+export const blog = defineCollection({
+  id: 'blog',
+  contentDir: 'content/blog',
+  pathSegment: 'blog',       // → /[lang]/blog/[slug]
+  site,
+});
+
+export const glossary = defineCollection({
+  id: 'glossary',
+  contentDir: 'content/glossary',
+  pathSegment: 'glossary',
+  schemaType: 'DefinedTerm', // built-in glossary schema
+  rss: false,
+  site,
 });
 ```
 
-2. Put markdown files in **`posts/`** (or another directory; pass `postsDir` in options).
+## Write a post
 
-3. Add a dynamic route that loads a post. Use **async `params`** (Next.js 16 App Router):
+```md filename="content/blog/welcome.md"
+---
+title: Welcome
+description: First post.
+date: 2026-01-01
+tags: [intro]
+---
+
+Hello world.
+```
+
+## Render it (App Router)
 
 ```tsx filename="app/blog/[slug]/page.tsx"
-import {
-  getBlogPost,
-  getAllBlogPosts,
-  generateBlogPostMetadata,
-  MarkdownContent,
-} from '@next-md-blog/core';
 import { notFound } from 'next/navigation';
-import type { Metadata } from 'next';
-import blogConfig from '@/next-md-blog.config';
+import { MarkdownContent } from '@next-md-blog/core';
+import { blog } from '@/next-md-blog.config';
 
 export async function generateStaticParams() {
-  const posts = await getAllBlogPosts({ config: blogConfig });
+  const posts = await blog.getAll();
   return posts.map((post) => ({ slug: post.slug }));
 }
 
-export async function generateMetadata(props: {
-  params: Promise<{ slug: string }>;
-}): Promise<Metadata> {
-  const { slug } = await props.params;
-  const post = await getBlogPost(slug, { config: blogConfig });
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const post = await blog.getOne(slug);
   if (!post) return { title: 'Not found' };
-  return generateBlogPostMetadata(post, blogConfig);
+  return blog.metadata(post);
 }
 
-export default async function Page(props: {
-  params: Promise<{ slug: string }>;
-}) {
-  const { slug } = await props.params;
-  const post = await getBlogPost(slug, { config: blogConfig });
+export default async function Page({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const post = await blog.getOne(slug);
   if (!post) notFound();
-
-  return (
-    <article className="prose dark:prose-invert max-w-none">
-      <h1>{post.frontmatter.title ?? post.slug}</h1>
-      <MarkdownContent content={post.content} />
-    </article>
-  );
+  return <MarkdownContent content={post.content} />;
 }
 ```
 
-4. Wrap rendered markdown in **`prose`** classes from **`@tailwindcss/typography`** for readable typography (the CLI can wire this up).
+That's the minimum. The collection encapsulates `contentDir`, `config`, locale handling, and schema generation — no more threading options through every call site.
 
-## 4. Styling
+## Site-wide files (`app/sitemap.ts`, `robots.ts`, `feed.xml`)
 
-The library does not ship a global stylesheet for article body text. Use Tailwind Typography (`prose`, `dark:prose-invert`) or your own CSS. See [Configuration](/configuration) for config-related author and URL fields used in SEO.
+```ts filename="app/sitemap.ts"
+import { composeSitemap } from '@next-md-blog/core';
+import { blog, glossary, site } from '@/next-md-blog.config';
+
+const LOCALES = [site.defaultLang ?? 'en'] as const;
+
+export default async function sitemap() {
+  return composeSitemap({
+    collections: [blog, glossary],
+    locales: LOCALES,
+  });
+}
+```
+
+```ts filename="app/robots.ts"
+import { getRobots } from '@next-md-blog/core/next';
+import { site } from '@/next-md-blog.config';
+
+export default () => getRobots(site);
+```
+
+```ts filename="app/feed.xml/route.ts"
+import { blog } from '@/next-md-blog.config';
+
+export async function GET() {
+  return blog.rssResponse();
+}
+```
+
+## Next steps
+
+- [Configuration](/configuration) — every `defineSite` and `defineCollection` field.
+- [Content & frontmatter](/content-and-frontmatter) — what frontmatter fields the library understands.
+- [SEO & feeds](/seo-and-feeds) — metadata helpers, JSON-LD graph, sitemap composition, llms.txt.
+- [Internationalization](/internationalization) — per-locale collections and hreflang.
+- [CLI](/cli) — what `npx @next-md-blog/cli` scaffolds.

@@ -1,12 +1,9 @@
-import { getAllBlogPosts } from '@next-md-blog/core';
 import Link from 'next/link';
-import blogConfig from '@/next-md-blog.config';
-{{POSTS_DIR_OPTION}}
+import { blog } from '@/next-md-blog.config';
+
 export async function getStaticProps() {
-  const posts = await getAllBlogPosts({{POSTS_DIR_PARAM}});
-  return {
-    props: { posts },
-  };
+  const posts = await blog.getAll();
+  return { props: { posts } };
 }
 
 export default function BlogsPage({ posts }: { posts: any[] }) {
@@ -38,12 +35,6 @@ export default function BlogsPage({ posts }: { posts: any[] }) {
                       {post.frontmatter.description}
                     </p>
                   )}
-                  <div className="mt-auto flex items-center pt-4 text-sm font-medium text-primary">
-                    Read article
-                    <svg className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
                 </div>
               </Link>
             </li>

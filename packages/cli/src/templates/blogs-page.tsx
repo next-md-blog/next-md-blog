@@ -1,23 +1,18 @@
-import { getAllBlogPosts, generateBlogListMetadata } from '@next-md-blog/core';
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import blogConfig from '@/next-md-blog.config';
-{{POSTS_DIR_OPTION}}
+import { blog } from '@/next-md-blog.config';
 
-/**
- * Generate SEO metadata for the blogs listing page
- */
 export async function generateMetadata({ params }: { params: Promise<{{PARAMS_TYPE}}> }): Promise<Metadata> {
   const resolvedParams = await params;
 {{LOCALE_EXTRACT}}
-  const posts = await getAllBlogPosts({{POSTS_DIR_PARAM}});
-  return generateBlogListMetadata(posts);
+  const posts = await blog.getAll({{GET_OPTS}});
+  return {{LIST_METADATA_CALL}};
 }
 
 export default async function BlogsPage({ params }: { params: Promise<{{PARAMS_TYPE}}> }) {
   const resolvedParams = await params;
 {{LOCALE_EXTRACT}}
-  const posts = await getAllBlogPosts({{POSTS_DIR_PARAM}});
+  const posts = await blog.getAll({{GET_OPTS}});
 
   return (
     <div className="min-h-screen">
@@ -33,8 +28,7 @@ export default async function BlogsPage({ params }: { params: Promise<{{PARAMS_T
           <div className="rounded-xl border border-dashed border-border bg-card/50 px-6 py-12 text-center">
             <p className="text-foreground font-medium mb-2">No posts yet</p>
             <p className="text-sm text-muted-foreground">
-              Add markdown files to{' '}
-              <code className="rounded-md bg-muted px-2 py-0.5 font-mono text-xs">{{CONTENT_DIR}}/</code>
+              Add markdown files to your collection's <code className="rounded-md bg-muted px-2 py-0.5 font-mono text-xs">contentDir</code>.
             </p>
           </div>
         ) : (
@@ -57,9 +51,6 @@ export default async function BlogsPage({ params }: { params: Promise<{{PARAMS_T
                     <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                       {post.frontmatter?.date && (
                         <span className="inline-flex items-center gap-1.5">
-                          <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                          </svg>
                           <time dateTime={post.frontmatter.date}>
                             {new Date(post.frontmatter.date).toLocaleDateString(undefined, {
                               year: 'numeric',
@@ -71,28 +62,15 @@ export default async function BlogsPage({ params }: { params: Promise<{{PARAMS_T
                       )}
                       {post.authors && post.authors.length > 0 && (
                         <span className="inline-flex items-center gap-1.5">
-                          <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                          </svg>
-                          <span>
-                            {post.authors.map((author, idx) => {
-                              const name = typeof author === 'string' ? author : author.name;
-                              return (
-                                <span key={idx}>
-                                  {idx > 0 && ', '}
-                                  {name}
-                                </span>
-                              );
-                            })}
-                          </span>
-                        </span>
-                      )}
-                      {post.readingTime > 0 && (
-                        <span className="inline-flex items-center gap-1.5">
-                          <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          {post.readingTime} min read
+                          {post.authors.map((author, idx) => {
+                            const name = typeof author === 'string' ? author : author.name;
+                            return (
+                              <span key={idx}>
+                                {idx > 0 && ', '}
+                                {name}
+                              </span>
+                            );
+                          })}
                         </span>
                       )}
                     </div>
@@ -108,12 +86,6 @@ export default async function BlogsPage({ params }: { params: Promise<{{PARAMS_T
                         ))}
                       </div>
                     )}
-                    <div className="mt-auto flex items-center pt-4 text-sm font-medium text-primary">
-                      Read article
-                      <svg className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
                   </div>
                 </Link>
               </li>
