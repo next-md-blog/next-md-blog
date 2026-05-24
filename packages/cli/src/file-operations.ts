@@ -210,7 +210,7 @@ export function createNextJSRoutes(config: CLIConfig, options?: { force?: boolea
     
     const blogSlugPath = path.join(blogDir, '[slug].tsx');
     if (!fs.existsSync(blogSlugPath)) {
-      fs.writeFileSync(blogSlugPath, generatePagesRouterBlogPage(config));
+      fs.writeFileSync(blogSlugPath, generatePagesRouterBlogPage());
       console.log(`✓ Created ${blogSlugPath}`);
     } else {
       console.log(`⚠ ${blogSlugPath} already exists, skipping`);
