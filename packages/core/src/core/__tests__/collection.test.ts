@@ -302,6 +302,119 @@ describe('defineCollection — schema', () => {
   });
 });
 
+describe('defineCollection — FAQ + HowTo @graph nodes', () => {
+  beforeAll(() => {
+    writePost('content/blog/en', 'rich-results', {
+      title: 'Rich results post',
+      description: 'Demo of FAQ + HowTo frontmatter.',
+      date: '2026-03-01',
+      faq: [
+        { question: 'Is this rendered?', answer: 'Yes — as FAQPage JSON-LD.' },
+        { question: 'And HowTo?', answer: 'Also as a separate @graph node.' },
+      ],
+      howto: {
+        name: 'Demo HowTo',
+        description: 'A short demo',
+        totalTime: 'PT5M',
+        supply: ['Markdown file'],
+        tool: ['next-md-blog'],
+        yield: '1 indexed post',
+        estimatedCost: { currency: 'USD', value: 0 },
+        steps: [
+          { name: 'Add frontmatter', text: 'Drop a `faq` and `howto` block.' },
+          { name: 'Rebuild', text: 'npm run build.', image: '/img/step.png' },
+        ],
+      },
+    });
+  });
+
+  it('emits FAQPage when faq frontmatter is present', async () => {
+    const blog = makeBlog();
+    const doc = (await blog.getOne('rich-results', { locale: 'en' }))!;
+    const graph = blog.schemaGraph(doc, undefined, { locale: 'en' }) as {
+      '@graph': Array<Record<string, unknown>>;
+    };
+    const faq = graph['@graph'].find((n) => n['@type'] === 'FAQPage') as
+      | { mainEntity: Array<Record<string, unknown>> }
+      | undefined;
+    expect(faq).toBeDefined();
+    expect(faq!.mainEntity).toHaveLength(2);
+    expect(faq!.mainEntity[0]).toMatchObject({
+      '@type': 'Question',
+      name: 'Is this rendered?',
+      acceptedAnswer: { '@type': 'Answer', text: 'Yes — as FAQPage JSON-LD.' },
+    });
+  });
+
+  it('emits HowTo with steps, totalTime, supply, tool, yield, cost', async () => {
+    const blog = makeBlog();
+    const doc = (await blog.getOne('rich-results', { locale: 'en' }))!;
+    const graph = blog.schemaGraph(doc, undefined, { locale: 'en' }) as {
+      '@graph': Array<Record<string, unknown>>;
+    };
+    const howto = graph['@graph'].find((n) => n['@type'] === 'HowTo')!;
+    expect(howto.name).toBe('Demo HowTo');
+    expect(howto.totalTime).toBe('PT5M');
+    expect(howto.inLanguage).toBe('en');
+    expect(howto.estimatedCost).toMatchObject({
+      '@type': 'MonetaryAmount',
+      currency: 'USD',
+      value: '0',
+    });
+    expect(howto.supply).toEqual([
+      { '@type': 'HowToSupply', name: 'Markdown file' },
+    ]);
+    expect(howto.tool).toEqual([
+      { '@type': 'HowToTool', name: 'next-md-blog' },
+    ]);
+    expect(howto.yield).toBe('1 indexed post');
+    expect(howto.step).toHaveLength(2);
+    expect((howto.step as Array<Record<string, unknown>>)[1]).toMatchObject({
+      '@type': 'HowToStep',
+      name: 'Rebuild',
+      text: 'npm run build.',
+      image: '/img/step.png',
+    });
+  });
+
+  it('does not emit FAQPage / HowTo when frontmatter is absent', async () => {
+    const blog = makeBlog();
+    const doc = (await blog.getOne('hello', { locale: 'en' }))!;
+    const graph = blog.schemaGraph(doc, undefined, { locale: 'en' }) as {
+      '@graph': Array<Record<string, unknown>>;
+    };
+    expect(graph['@graph'].find((n) => n['@type'] === 'FAQPage')).toBeUndefined();
+    expect(graph['@graph'].find((n) => n['@type'] === 'HowTo')).toBeUndefined();
+  });
+
+  it('falls back to post title/description for HowTo name/description', async () => {
+    const fmOnly = JSON.stringify({
+      title: 'Title fallback test',
+      description: 'Description fallback test',
+      date: '2026-03-02',
+      howto: {
+        steps: [{ name: 'Only step', text: 'Just one.' }],
+      },
+    });
+    void fmOnly; // placeholder to keep test descriptive
+
+    writePost('content/blog/en', 'fallback', {
+      title: 'Title fallback test',
+      description: 'Description fallback test',
+      date: '2026-03-02',
+      howto: { steps: [{ name: 'Only step', text: 'Just one.' }] },
+    });
+    const blog = makeBlog();
+    const doc = (await blog.getOne('fallback', { locale: 'en' }))!;
+    const graph = blog.schemaGraph(doc, undefined, { locale: 'en' }) as {
+      '@graph': Array<Record<string, unknown>>;
+    };
+    const howto = graph['@graph'].find((n) => n['@type'] === 'HowTo')!;
+    expect(howto.name).toBe('Title fallback test');
+    expect(howto.description).toBe('Description fallback test');
+  });
+});
+
 describe('defineCollection — queries', () => {
   it('getByAuthor filters via slugified author names', async () => {
     const blog = makeBlog();
