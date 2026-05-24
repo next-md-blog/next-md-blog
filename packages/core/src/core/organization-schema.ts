@@ -1,6 +1,11 @@
-import type { Config } from './types.js';
-import { DEFAULT_SITE_NAME } from './constants.js';
-import { getConfig } from './config.js';
+import type { SiteOrganization } from './types.js';
+
+/** Structural type — accepts a full SiteConfig or any legacy Config. */
+interface OrgSource {
+  siteName?: string;
+  siteUrl?: string;
+  organization?: SiteOrganization;
+}
 
 /**
  * Normalizes siteUrl to an origin with no trailing slash (empty string if invalid).
@@ -18,11 +23,10 @@ export function normalizeSiteOrigin(siteUrl: string | undefined): string {
 /**
  * Stable @id for the site Organization node (fragment on origin).
  */
-export function resolveOrganizationId(config?: Config): string | undefined {
-  const blogConfig = config || getConfig();
-  const org = blogConfig.organization;
+export function resolveOrganizationId(source?: OrgSource): string | undefined {
+  const org = source?.organization;
   if (org?.id?.trim()) return org.id.trim();
-  const origin = normalizeSiteOrigin(blogConfig.siteUrl);
+  const origin = normalizeSiteOrigin(source?.siteUrl);
   if (!origin) return undefined;
   return `${origin}/#organization`;
 }
@@ -30,18 +34,17 @@ export function resolveOrganizationId(config?: Config): string | undefined {
 /**
  * JSON-LD Organization node for publisher / standalone script.
  */
-export function buildOrganizationNode(config?: Config): Record<string, unknown> | undefined {
-  const blogConfig = config || getConfig();
-  const {
-    siteName = DEFAULT_SITE_NAME,
-    siteUrl = '',
-    organization: org,
-  } = blogConfig;
+export function buildOrganizationNode(
+  source?: OrgSource,
+): Record<string, unknown> | undefined {
+  const siteName = source?.siteName;
+  const siteUrl = source?.siteUrl ?? '';
+  const org = source?.organization;
 
   if (!siteName) return undefined;
 
   const origin = normalizeSiteOrigin(siteUrl);
-  const id = resolveOrganizationId(blogConfig);
+  const id = resolveOrganizationId(source);
 
   const node: Record<string, unknown> = {
     '@context': 'https://schema.org',
@@ -56,10 +59,7 @@ export function buildOrganizationNode(config?: Config): Record<string, unknown> 
   if (org?.legalName) node.legalName = org.legalName;
   if (org?.description) node.description = org.description;
   if (org?.logo) {
-    node.logo = {
-      '@type': 'ImageObject',
-      url: org.logo,
-    };
+    node.logo = { '@type': 'ImageObject', url: org.logo };
   }
   if (org?.foundingDate) node.foundingDate = org.foundingDate;
   if (org?.founder) {
@@ -71,7 +71,6 @@ export function buildOrganizationNode(config?: Config): Record<string, unknown> 
   if (org?.contactPoint && Object.values(org.contactPoint).some(Boolean)) {
     node.contactPoint = { '@type': 'ContactPoint', ...org.contactPoint };
   }
-  // Merge wikidata into sameAs (deduplicated).
   const sameAsList = [
     ...(org?.sameAs ?? []),
     ...(org?.wikidata ? [org.wikidata] : []),
@@ -86,13 +85,17 @@ export function buildOrganizationNode(config?: Config): Record<string, unknown> 
 /**
  * Standalone Organization JSON-LD for layout or @graph.
  */
-export function generateOrganizationSchema(config?: Config): Record<string, unknown> | undefined {
-  return buildOrganizationNode(config);
+export function generateOrganizationSchema(
+  source?: OrgSource,
+): Record<string, unknown> | undefined {
+  return buildOrganizationNode(source);
 }
 
 /** Publisher object for BlogPosting (no @context). */
-export function buildPublisherEmbedded(config?: Config): Record<string, unknown> | undefined {
-  const node = buildOrganizationNode(config);
+export function buildPublisherEmbedded(
+  source?: OrgSource,
+): Record<string, unknown> | undefined {
+  const node = buildOrganizationNode(source);
   if (!node) return undefined;
   const rest = { ...node };
   delete rest['@context'];
@@ -100,6 +103,8 @@ export function buildPublisherEmbedded(config?: Config): Record<string, unknown>
 }
 
 /** Organization node for @graph (no @context). */
-export function buildOrganizationGraphNode(config?: Config): Record<string, unknown> | undefined {
-  return buildPublisherEmbedded(config);
+export function buildOrganizationGraphNode(
+  source?: OrgSource,
+): Record<string, unknown> | undefined {
+  return buildPublisherEmbedded(source);
 }
