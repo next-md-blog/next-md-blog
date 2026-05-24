@@ -59,7 +59,12 @@ export type {
 } from './core/compose.js';
 
 // Shared frontmatter type — used as the default `TFrontmatter` parameter.
-export type { BlogPostFrontmatter } from './core/types.js';
+export type {
+  BlogPostFrontmatter,
+  FaqItem,
+  HowToFrontmatter,
+  HowToStepFrontmatter,
+} from './core/types.js';
 
 // Components (unchanged)
 export { MarkdownContent } from './components/MarkdownContent.js';
