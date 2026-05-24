@@ -531,6 +531,106 @@ function definedTermBuilder<TFrontmatter extends BaseFrontmatter>(
   return schema;
 }
 
+/**
+ * Build a `FAQPage` `@graph` node from frontmatter, or `null` if `faq` is empty.
+ */
+function buildFaqNode(
+  fm: BaseFrontmatter,
+): Record<string, unknown> | null {
+  const items = fm.faq;
+  if (!Array.isArray(items) || items.length === 0) return null;
+  const mainEntity = items
+    .filter(
+      (it): it is { question: string; answer: string } =>
+        !!it &&
+        typeof it === 'object' &&
+        typeof (it as { question?: unknown }).question === 'string' &&
+        typeof (it as { answer?: unknown }).answer === 'string',
+    )
+    .map((it) => ({
+      '@type': 'Question',
+      name: it.question,
+      acceptedAnswer: { '@type': 'Answer', text: it.answer },
+    }));
+  if (mainEntity.length === 0) return null;
+  return {
+    '@type': 'FAQPage',
+    mainEntity,
+  };
+}
+
+/**
+ * Build a `HowTo` `@graph` node from frontmatter, or `null` if `howto` is unset
+ * / has no steps. Falls back to post title / description for `name` / `description`.
+ */
+function buildHowToNode(
+  fm: BaseFrontmatter,
+  locale?: string,
+): Record<string, unknown> | null {
+  const data = fm.howto;
+  if (!data || typeof data !== 'object') return null;
+  const steps = (data as { steps?: unknown }).steps;
+  if (!Array.isArray(steps) || steps.length === 0) return null;
+
+  const stepNodes = steps
+    .filter(
+      (s): s is { name: string; text: string; image?: string; url?: string } =>
+        !!s &&
+        typeof s === 'object' &&
+        typeof (s as { name?: unknown }).name === 'string' &&
+        typeof (s as { text?: unknown }).text === 'string',
+    )
+    .map((s) => {
+      const node: Record<string, unknown> = {
+        '@type': 'HowToStep',
+        name: s.name,
+        text: s.text,
+      };
+      if (s.image) node.image = s.image;
+      if (s.url) node.url = s.url;
+      return node;
+    });
+  if (stepNodes.length === 0) return null;
+
+  const name =
+    (data as { name?: string }).name ??
+    (typeof fm.title === 'string' ? fm.title : undefined);
+  const description =
+    (data as { description?: string }).description ??
+    (typeof fm.description === 'string' ? fm.description : undefined);
+
+  const node: Record<string, unknown> = {
+    '@type': 'HowTo',
+    ...(name && { name }),
+    ...(description && { description }),
+    step: stepNodes,
+  };
+  const totalTime = (data as { totalTime?: string }).totalTime;
+  if (totalTime) node.totalTime = totalTime;
+  const estimatedCost = (data as { estimatedCost?: { currency: string; value: string | number } }).estimatedCost;
+  if (estimatedCost?.currency && estimatedCost?.value !== undefined) {
+    node.estimatedCost = {
+      '@type': 'MonetaryAmount',
+      currency: estimatedCost.currency,
+      value: String(estimatedCost.value),
+    };
+  }
+  const supply = (data as { supply?: string[] }).supply;
+  if (Array.isArray(supply) && supply.length > 0) {
+    node.supply = supply.map((s) => ({ '@type': 'HowToSupply', name: s }));
+  }
+  const tool = (data as { tool?: string[] }).tool;
+  if (Array.isArray(tool) && tool.length > 0) {
+    node.tool = tool.map((t) => ({ '@type': 'HowToTool', name: t }));
+  }
+  const yieldText = (data as { yield?: string }).yield;
+  if (yieldText) node.yield = yieldText;
+  const image = (data as { image?: string }).image;
+  if (image) node.image = image;
+  if (locale) node.inLanguage = locale;
+  return node;
+}
+
 function pickSchemaBuilder<TFrontmatter extends BaseFrontmatter>(
   config: ResolvedCollectionConfig<TFrontmatter>,
 ): SchemaBuilder<TFrontmatter> {
@@ -1075,6 +1175,15 @@ export function defineCollection<
       delete crumbsBody['@context'];
       graph.push(crumbsBody);
     }
+
+    // Additional rich-result nodes derived from frontmatter.
+    const faqNode = buildFaqNode(doc.frontmatter as BaseFrontmatter);
+    if (faqNode) graph.push(faqNode);
+    const howToNode = buildHowToNode(
+      doc.frontmatter as BaseFrontmatter,
+      opts.locale,
+    );
+    if (howToNode) graph.push(howToNode);
 
     return { '@context': 'https://schema.org', '@graph': graph };
   }

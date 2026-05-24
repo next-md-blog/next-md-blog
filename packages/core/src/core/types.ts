@@ -128,7 +128,54 @@ export interface BlogPostFrontmatter {
   factCheckedBy?: string;
   /** E-E-A-T: date of last editorial review (yyyy-mm-dd). */
   lastReviewed?: string;
+  /**
+   * FAQ items rendered as Schema.org `FAQPage` JSON-LD alongside the article.
+   * Each item becomes a `Question` + `Answer` pair. Empty array is ignored.
+   */
+  faq?: FaqItem[];
+  /**
+   * HowTo data rendered as Schema.org `HowTo` JSON-LD alongside the article.
+   * `steps` is required (≥ 1); everything else is optional.
+   */
+  howto?: HowToFrontmatter;
   [key: string]: unknown;
+}
+
+/** A single FAQ entry (mapped to Schema.org Question + Answer). */
+export interface FaqItem {
+  question: string;
+  answer: string;
+}
+
+/** Schema.org HowTo as a frontmatter-friendly shape. */
+export interface HowToFrontmatter {
+  /** Defaults to post title. */
+  name?: string;
+  /** Defaults to post description. */
+  description?: string;
+  /** ISO 8601 duration (e.g. `PT15M`). */
+  totalTime?: string;
+  /** Optional cost block. */
+  estimatedCost?: { currency: string; value: string | number };
+  /** Materials, ingredients, prerequisites. */
+  supply?: string[];
+  /** Tools / software needed. */
+  tool?: string[];
+  /** Free-form yield (e.g. "Serves 4", "1 deployed site"). */
+  yield?: string;
+  /** Result image URL. */
+  image?: string;
+  /** Step list — Google requires at least one. */
+  steps: HowToStepFrontmatter[];
+}
+
+export interface HowToStepFrontmatter {
+  name: string;
+  text: string;
+  /** Step image URL (recommended for richer SERP cards). */
+  image?: string;
+  /** Anchor URL to the corresponding section within the post. */
+  url?: string;
 }
 
 /**
