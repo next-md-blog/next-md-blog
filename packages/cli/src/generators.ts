@@ -112,7 +112,7 @@ export function generateOgImage(config: CLIConfig): string {
 // Pages Router templates (no i18n)
 // ---------------------------------------------------------------------------
 
-export function generatePagesRouterBlogPage(_config: CLIConfig): string {
+export function generatePagesRouterBlogPage(): string {
   return loadTemplate('pages-router-blog-page.tsx', {});
 }
 
