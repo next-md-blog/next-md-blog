@@ -1,11 +1,22 @@
-import { createConfig } from '@next-md-blog/core';
+import { defineSite, defineCollection } from '@next-md-blog/core';
 
-export default createConfig({
+export const site = defineSite({
   siteName: 'Multi-Language Blog',
   siteUrl: process.env.NEXT_PUBLIC_SITE_URL || 'https://example.com',
   defaultAuthor: 'Example Author',
   twitterHandle: '@example',
   defaultLang: 'en',
-  // OG images are automatically generated via opengraph-image.tsx file convention
-  // defaultOgImage: 'https://example.com/default-og.jpg',
 });
+
+export const LOCALES = ['en', 'fr'] as const;
+
+export const blog = defineCollection({
+  id: 'blog',
+  contentDir: 'posts',
+  pathSegment: 'blog',
+  indexPath: '/blogs',
+  site,
+});
+
+// Default export kept for tooling that imports a single config.
+export default site;

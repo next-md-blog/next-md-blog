@@ -113,7 +113,7 @@ describe('cli init integration', () => {
     expect(fs.existsSync(path.join(tmpDir, 'app', 'robots.ts'))).toBe(true);
     expect(fs.existsSync(path.join(tmpDir, 'app', 'feed.xml', 'route.ts'))).toBe(true);
     const feed = fs.readFileSync(path.join(tmpDir, 'app', 'feed.xml', 'route.ts'), 'utf8');
-    expect(feed).toContain('createRssFeedResponse');
+    expect(feed).toContain('blog.rssResponse');
   });
 
   it('writeAppSeoFiles overwrites when force is true', () => {
@@ -130,6 +130,6 @@ describe('cli init integration', () => {
     writeAppSeoFiles(config, { force: true });
     const content = fs.readFileSync(sitemapPath, 'utf8');
     expect(content).not.toContain('// stale');
-    expect(content).toContain('getBlogSitemap');
+    expect(content).toContain('composeSitemap');
   });
 });

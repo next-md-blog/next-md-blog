@@ -1,4 +1,3 @@
-import { getAllBlogPosts, generateBlogListMetadata } from '@next-md-blog/core';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { Button } from '@/components/ui/button';
@@ -7,25 +6,25 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { Calendar, User, ArrowRight, Clock } from 'lucide-react';
 import { LocaleSwitcher } from '@/components/locale-switcher';
 import { DocsLink } from '@/components/docs-link';
-import blogConfig from '@/next-md-blog.config';
+import { blog } from '@/next-md-blog.config';
 
-/**
- * Generate SEO metadata for the blogs listing page
- */
-export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
-  const resolvedParams = await params;
-  const { locale } = resolvedParams;
-  const posts = await getAllBlogPosts({ locale, config: blogConfig });
-  return generateBlogListMetadata(posts);
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const posts = await blog.getAll({ locale });
+  return blog.listMetadata(posts, { locale });
 }
 
-/**
- * Blogs listing page
- */
-export default async function BlogsPage({ params }: { params: Promise<{ locale: string }> }) {
-  const resolvedParams = await params;
-  const { locale } = resolvedParams;
-  const posts = await getAllBlogPosts({ locale, config: blogConfig });
+export default async function BlogsPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  const posts = await blog.getAll({ locale });
 
   return (
     <div className="min-h-screen">

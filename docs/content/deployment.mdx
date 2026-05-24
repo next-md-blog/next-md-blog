@@ -38,7 +38,7 @@ If anything fails, open Vercel’s build log: almost always either install ran i
 
 ## Apps that consume `@next-md-blog/core`
 
-Deploy like any Next.js site. Set **`NEXT_PUBLIC_SITE_URL`** to the live origin in production so canonical and Open Graph URLs match your domain. Combine **`generateStaticParams`** with **`getAllBlogPosts`** for static post pages when appropriate.
+Deploy like any Next.js site. Set **`NEXT_PUBLIC_SITE_URL`** to the live origin in production so canonical and Open Graph URLs match your domain. Combine **`generateStaticParams`** with **`collection.getAll()`** for static post pages when appropriate.
 
 ### One-click templates on Vercel
 
