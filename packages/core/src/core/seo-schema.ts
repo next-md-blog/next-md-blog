@@ -15,16 +15,43 @@ import {
   resolveOrganizationId,
 } from './organization-schema.js';
 
-/** Options for `generateBlogPostSchema` */
+/** Options for `generateBlogPostSchema`. */
 export interface BlogPostSchemaOptions {
   /** If true and an organization @id exists, publisher is `{ "@id": "..." }` only */
   publisherReference?: boolean;
+  /** Locale segment, used for URL building and `inLanguage`. */
+  locale?: string;
+  /**
+   * Speakable specification (https://schema.org/speakable). Pass `true` to use a
+   * sensible default (article header + first paragraph), or your own selectors.
+   */
+  speakable?: boolean | { cssSelector?: string[]; xpath?: string[] };
+  /**
+   * Free-form mutation of the BlogPosting node before serialization. Use this
+   * for HowTo extensions, custom fields, isPartOf overrides, etc.
+   */
+  extendArticle?: (node: Record<string, unknown>) => Record<string, unknown>;
+}
+
+const DEFAULT_SPEAKABLE_SELECTORS = [
+  'article > header h1',
+  'article > header p',
+];
+
+function slugifySeries(value: string): string {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^\p{Letter}\p{Number}\s-]/gu, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
 }
 
 /**
- * Generates JSON-LD structured data (Schema.org) for a blog post
+ * Generates JSON-LD structured data (Schema.org) for a blog post.
  * @param post - The blog post
  * @param config - SEO configuration
+ * @param options - Locale, speakable, publisher reference, extension hook
  * @returns JSON-LD schema object
  */
 export function generateBlogPostSchema(
@@ -40,6 +67,7 @@ export function generateBlogPostSchema(
     authors: configAuthors,
   } = blogConfig;
   const publisherReference = options?.publisherReference === true;
+  const locale = options?.locale;
 
   const fm = post.frontmatter;
 
@@ -49,23 +77,24 @@ export function generateBlogPostSchema(
     fm,
     ''
   ) || '';
-  // Use normalized authors from post, or fallback to default author (resolved from config if available)
-  // Note: post.authors should already be resolved from config.authors when the post was loaded (in file-utils.ts)
-  // However, we ensure they are resolved here as a safety net in case resolution didn't happen earlier
+  // Use normalized authors from post, or fallback to default author (resolved from config if available).
   const resolvedDefaultAuthor = resolveDefaultAuthor(defaultAuthor, configAuthors);
-  const postAuthors = (post.authors && post.authors.length > 0) 
-    ? post.authors 
+  const postAuthors = (post.authors && post.authors.length > 0)
+    ? post.authors
     : (resolvedDefaultAuthor ? [resolvedDefaultAuthor] : []);
-  
-  // Ensure all authors are resolved from config (safety net)
+
   const authors = ensureAuthorsResolved(postAuthors, configAuthors);
   const publishedDate = resolveFrontmatterField<string>(['publishedDate', 'date'], fm);
-  const modifiedDate = resolveFrontmatterField<string>(['modifiedDate'], fm) || publishedDate;
+  // `updated` is a first-class alias for `modifiedDate`.
+  const modifiedDate =
+    resolveFrontmatterField<string>(['modifiedDate', 'updated'], fm) ||
+    publishedDate;
   const postUrl = resolvePostUrlWithConfig(
     resolveFrontmatterField<string>(['canonicalUrl'], fm),
     post.slug,
     siteUrl,
-    blogConfig
+    blogConfig,
+    locale
   );
   const ogImageUrl = resolveFrontmatterField<string>(['ogImage', 'image'], fm);
 
@@ -89,6 +118,8 @@ export function generateBlogPostSchema(
       ...(author.avatar && { image: author.avatar }),
     };
   };
+
+  const lang = locale ?? resolveFrontmatterField<string>(['lang'], fm);
 
   // Base schema
   const schema: Record<string, unknown> = {
@@ -130,35 +161,76 @@ export function generateBlogPostSchema(
     ...(isStringArray(fm.tags) && fm.tags.length > 0 && {
       keywords: fm.tags.join(', '),
     }),
-    ...(resolveFrontmatterField<string>(['lang'], fm) ? { inLanguage: resolveFrontmatterField<string>(['lang'], fm)! } : {}),
+    ...(lang ? { inLanguage: lang } : {}),
     ...(wordCount > 0 && { wordCount }),
     ...(readingTime > 0 && {
       timeRequired: `PT${readingTime}M`,
     }),
   };
 
-  // Merge with custom schema from frontmatter
-  if (fm.schema && typeof fm.schema === 'object') {
-    return {
-      ...schema,
-      ...(fm.schema as Record<string, unknown>),
+  // Speakable spec (voice-assistant friendly).
+  if (options?.speakable) {
+    const sp =
+      options.speakable === true
+        ? { cssSelector: DEFAULT_SPEAKABLE_SELECTORS }
+        : options.speakable;
+    schema.speakable = { '@type': 'SpeakableSpecification', ...sp };
+  }
+
+  // E-E-A-T: reviewer / fact-checker / last reviewed.
+  const reviewedBy = resolveFrontmatterField<string>(['reviewedBy'], fm);
+  if (reviewedBy) {
+    schema.reviewedBy = { '@type': 'Person', name: reviewedBy };
+  }
+  const factCheckedBy = resolveFrontmatterField<string>(['factCheckedBy'], fm);
+  if (factCheckedBy) {
+    schema.factCheckedBy = { '@type': 'Person', name: factCheckedBy };
+  }
+  const lastReviewed = resolveFrontmatterField<string>(['lastReviewed'], fm);
+  if (lastReviewed) {
+    schema.lastReviewed = lastReviewed;
+  }
+
+  // Series → isPartOf the pillar CollectionPage.
+  const series = resolveFrontmatterField<string>(['series'], fm);
+  if (series && siteUrl) {
+    const localeSeg = locale ? `/${locale}/` : '/';
+    const seriesSlug = slugifySeries(series);
+    const seriesTitle =
+      resolveFrontmatterField<string>(['seriesTitle'], fm) || series;
+    schema.isPartOf = {
+      '@type': 'CollectionPage',
+      '@id': `${siteUrl.replace(/\/$/, '')}${localeSeg}topics/${seriesSlug}`,
+      name: seriesTitle,
     };
   }
 
-  return schema;
+  // Merge with custom schema from frontmatter (frontmatter wins).
+  let merged = schema;
+  if (fm.schema && typeof fm.schema === 'object') {
+    merged = { ...schema, ...(fm.schema as Record<string, unknown>) };
+  }
+
+  // Free-form mutation hook (runs last).
+  if (options?.extendArticle) {
+    return options.extendArticle({ ...merged });
+  }
+  return merged;
 }
 
 /**
  * Generates breadcrumbs schema for a blog post
  * @param post - The blog post
  * @param config - SEO configuration
- * @param breadcrumbs - Optional custom breadcrumb items (e.g., [{ name: 'Home', url: '/' }, { name: 'Blog', url: '/blog' }])
+ * @param breadcrumbs - Optional custom breadcrumb items
+ * @param locale - Optional locale segment for URL building
  * @returns Breadcrumbs JSON-LD schema object
  */
 export function generateBreadcrumbsSchema(
   post: BlogPost,
   config?: Config,
-  breadcrumbs?: Array<{ name: string; url: string }>
+  breadcrumbs?: Array<{ name: string; url: string }>,
+  locale?: string
 ): Record<string, unknown> {
   const blogConfig = config || getConfig();
   const { siteUrl = '' } = blogConfig;
@@ -171,7 +243,8 @@ export function generateBreadcrumbsSchema(
     resolveFrontmatterField<string>(['canonicalUrl'], post.frontmatter),
     post.slug,
     siteUrl,
-    blogConfig
+    blogConfig,
+    locale
   );
 
   const blogIndexUrl = resolveBlogIndexUrl(siteUrl, blogConfig);
@@ -197,17 +270,34 @@ export function generateBreadcrumbsSchema(
   };
 }
 
+/** Options for `generateBlogPostSchemaGraph`. */
+export interface BlogPostSchemaGraphOptions {
+  locale?: string;
+  speakable?: BlogPostSchemaOptions['speakable'];
+  extendArticle?: BlogPostSchemaOptions['extendArticle'];
+}
+
 /**
  * Single JSON-LD `@graph` for Organization + BlogPosting + BreadcrumbList.
+ *
+ * Backwards-compatible: the 5th `options` parameter is optional. Passing
+ * `{ locale, speakable, extendArticle }` removes the need for app code to
+ * post-mutate the graph for locale-aware URLs and rich SEO fields.
  */
 export function generateBlogPostSchemaGraph(
   post: BlogPost,
   config?: Config,
   breadcrumbs?: Array<{ name: string; url: string }>,
-  includeBreadcrumbs = true
+  includeBreadcrumbs = true,
+  options?: BlogPostSchemaGraphOptions
 ): Record<string, unknown> {
   const orgNode = buildOrganizationGraphNode(config);
-  const article = generateBlogPostSchema(post, config, { publisherReference: true });
+  const article = generateBlogPostSchema(post, config, {
+    publisherReference: true,
+    ...(options?.locale !== undefined && { locale: options.locale }),
+    ...(options?.speakable !== undefined && { speakable: options.speakable }),
+    ...(options?.extendArticle !== undefined && { extendArticle: options.extendArticle }),
+  });
   const articleBody = { ...article };
   delete articleBody['@context'];
 
@@ -216,7 +306,7 @@ export function generateBlogPostSchemaGraph(
   graph.push(articleBody);
 
   if (includeBreadcrumbs) {
-    const crumbs = generateBreadcrumbsSchema(post, config, breadcrumbs);
+    const crumbs = generateBreadcrumbsSchema(post, config, breadcrumbs, options?.locale);
     const crumbsBody = { ...crumbs };
     delete crumbsBody['@context'];
     graph.push(crumbsBody);
@@ -227,4 +317,3 @@ export function generateBlogPostSchemaGraph(
     '@graph': graph,
   };
 }
-

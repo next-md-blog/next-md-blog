@@ -10,6 +10,22 @@ export type { BlogPostSEOProps } from './components/BlogPostSEO.js';
 // Utilities
 export { getBlogPost, getAllBlogPosts, getAllBlogPostSlugs } from './core/file-utils.js';
 
+// Query helpers (locale-aware, series, authors)
+export {
+  getPostInAllLocales,
+  getPostsByAuthor,
+  getPostsBySeries,
+  getAllAuthorSlugs,
+  getAllSeriesSlugs,
+  slugifyAuthor,
+  slugifySeries,
+  authorNamesFromFrontmatter,
+} from './core/queries.js';
+
+// llms.txt generators
+export { generateLlmsTxt, generateLlmsFullTxt } from './core/llms.js';
+export type { LlmsTxtOptions } from './core/llms.js';
+
 // SEO
 export {
   generateBlogPostMetadata,
@@ -21,7 +37,12 @@ export {
   generateOrganizationSchema,
   getBlogSitemapEntries,
 } from './core/seo.js';
-export type { BlogPostSchemaOptions, BlogSitemapEntry } from './core/seo.js';
+export type {
+  BlogPostSchemaOptions,
+  BlogPostSchemaGraphOptions,
+  BlogSitemapEntry,
+  GenerateBlogPostMetadataOptions,
+} from './core/seo.js';
 
 export {
   getBlogSitemap,
@@ -41,6 +62,8 @@ export type {
   Author,
   Config,
   SiteOrganization,
+  PostalAddress,
+  ContactPoint,
 } from './core/types.js';
 
 // Errors
@@ -56,4 +79,3 @@ export { POSTS_DIR_NAME, getPostsDirectory } from './core/constants.js';
 
 // Utilities
 export { calculateReadingTime, calculateWordCount, normalizeAuthors } from './core/utils.js';
-
