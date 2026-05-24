@@ -1,47 +1,95 @@
 ---
 title: Internationalization
-description: Locale-specific post folders and getBlogPost / getAllBlogPosts locale option.
+description: Locale subfolders, getInAllLocales, and locale-aware metadata / sitemap.
 ---
 
 # Internationalization
 
-## Folder layout
-
-When **`GetBlogPostOptions.locale`** is set (e.g. `'en'`), the library resolves the posts directory to:
+A `Collection` reads from `${contentDir}/${locale}/` whenever `opts.locale` is set. This makes it trivial to ship per-locale posts under the same `defineCollection({...})` instance.
 
 ```text
-{postsDir or posts}/{locale}/
+content/
+  blog/
+    en/
+      welcome.md
+    fr/
+      welcome.md
 ```
 
-For example, with default `posts` and `locale: 'fr'`, files are read from **`posts/fr/`**.
+## Reading per locale
 
-The **`@next-md-blog/cli`** can scaffold **`/[locale]/blog/...`** routes and locale subfolders when you enable i18n; see [CLI reference](/cli).
+```ts
+import { blog } from '@/next-md-blog.config';
 
-## API usage
-
-Pass the same **`locale`** for listing and detail routes:
-
-```tsx
-const posts = await getAllBlogPosts({ locale: 'en', config: blogConfig });
-const post = await getBlogPost('welcome', { locale: 'en', config: blogConfig });
+const enPosts = await blog.getAll({ locale: 'en' });
+const post = await blog.getOne('welcome', { locale: 'fr' });
 ```
 
-**`getAllBlogPostSlugs`** delegates to **`getAllBlogPosts`**, so slugs are per locale directory.
+## Hreflang
 
-## Config hints
+```ts
+// Map every sibling translation of `slug` to its locale-aware URL.
+const map = await blog.hreflangMap('welcome', ['en', 'fr', 'es']);
+// → { en: 'https://…/en/blog/welcome', fr: 'https://…/fr/blog/welcome' }
 
-- **`Config.defaultLang`** — default language code for site-level metadata.
-- **`Config.alternateLanguages`** — fallback hreflang map when a post has no **`frontmatter.alternateLanguages`** (usually too coarse for many posts; prefer frontmatter per file).
+return blog.metadata(post, {
+  locale,
+  titleTemplate: 'absolute', // bypass parent layout's `%s | Site` template
+  alternateLanguages: map,
+});
+```
 
-## Sitemap and hreflang
+Per-post overrides via `frontmatter.alternateLanguages` (a `Record<hreflang, url>`) win over the computed map.
 
-For **`/[locale]/blog/[slug]`**, each markdown file should set **`canonicalUrl`** (e.g. **`/en/blog/welcome`**) and **`alternateLanguages`** with every locale variant (relative paths are OK; they are resolved with **`siteUrl`** in metadata and sitemap).
+## Sitemap with hreflang
 
-In **`app/sitemap.ts`**, load posts for **each locale** with **`getAllBlogPosts({ locale, config })`** and pass the combined list to **`getBlogSitemap`**. The CLI **`seo`** subcommand with **`--i18n-enabled`** and **`--locales`** scaffolds locale-aware **`sitemap.ts`** and **`feed.xml/route.ts`** code for you (see [CLI reference](/cli)). Pass **locale-aware **`breadcrumbs`** into **`BlogPostSEO`** so JSON-LD matches your routes.
+Pass every supported locale to `sitemapEntries` or `composeSitemap` — each row gets an `xhtml:link rel="alternate" hreflang` per locale that has a translation, plus `x-default`.
 
-Routing (`generateStaticParams`, links) remains your app’s responsibility; the core package reads locale subfolders when **`options.locale`** is set.
+```ts
+import { composeSitemap } from '@next-md-blog/core';
+import { blog, glossary } from '@/next-md-blog.config';
 
-A hosted reference implementation is at **[demo.i18n.next-md-blog.com](https://demo.i18n.next-md-blog.com)** (see also [Demos](/demos)).
+export default async function sitemap() {
+  return composeSitemap({
+    collections: [blog, glossary],
+    locales: ['en', 'fr', 'es'],
+  });
+}
+```
+
+## Static params
+
+```ts
+const LOCALES = ['en', 'fr', 'es'] as const;
+
+export async function generateStaticParams() {
+  const out: Array<{ slug: string; locale: string }> = [];
+  for (const locale of LOCALES) {
+    const posts = await blog.getAll({ locale });
+    for (const p of posts) out.push({ slug: p.slug, locale });
+  }
+  return out;
+}
+```
+
+## Per-locale RSS
+
+```ts filename="app/[lang]/feed.xml/route.ts"
+import { blog, LOCALES } from '@/next-md-blog.config';
+
+export async function generateStaticParams() {
+  return LOCALES.map((lang) => ({ lang }));
+}
+
+export async function GET(_req: Request, { params }: { params: Promise<{ lang: string }> }) {
+  const { lang } = await params;
+  return blog.rssResponse({ locale: lang });
+}
+```
+
+## Reference implementation
+
+The i18n demo at **[demo.i18n.next-md-blog.com](https://demo.i18n.next-md-blog.com)** wires every step end-to-end (see [Demos](/demos)).
 
 **Deploy the i18n template on Vercel**
 

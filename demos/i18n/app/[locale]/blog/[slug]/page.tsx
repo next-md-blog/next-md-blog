@@ -1,10 +1,4 @@
 import type { ReactNode } from 'react';
-import {
-  getBlogPost,
-  getAllBlogPosts,
-  generateBlogPostMetadata,
-  BlogPostSEO,
-} from '@next-md-blog/core';
 import { MarkdownContent } from '@next-md-blog/core';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
@@ -14,56 +8,47 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { LocaleSwitcher } from '@/components/locale-switcher';
 import { DocsLink } from '@/components/docs-link';
 import { Calendar, User, Clock, FileText } from 'lucide-react';
-import blogConfig from '@/next-md-blog.config';
+import { blog, LOCALES } from '@/next-md-blog.config';
 
-const locales = ['en', 'fr'];
-
-/**
- * Generate static params for all blog posts
- */
 export async function generateStaticParams() {
-  const allParams: Array<{ slug: string; locale: string }> = [];
-  for (const locale of locales) {
-    const posts = await getAllBlogPosts({ locale });
-    for (const post of posts) {
-      allParams.push({ slug: post.slug, locale });
-    }
+  const out: Array<{ slug: string; locale: string }> = [];
+  for (const locale of LOCALES) {
+    const posts = await blog.getAll({ locale });
+    for (const post of posts) out.push({ slug: post.slug, locale });
   }
-  return allParams;
+  return out;
 }
 
-/**
- * Generate comprehensive SEO metadata for the blog post page
- */
-export async function generateMetadata({ params }: { params: Promise<{ slug: string; locale: string }> }): Promise<Metadata> {
-  const resolvedParams = await params;
-  const { slug, locale } = resolvedParams;
-  const post = await getBlogPost(slug, { locale, config: blogConfig });
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string; locale: string }>;
+}): Promise<Metadata> {
+  const { slug, locale } = await params;
+  const post = await blog.getOne(slug, { locale });
+  if (!post) return { title: 'Post Not Found' };
 
-  if (!post) {
-    return {
-      title: 'Post Not Found',
-    };
-  }
-
-  return generateBlogPostMetadata(post, blogConfig) as Metadata;
+  // hreflang: include every locale that has a sibling translation.
+  const alternateLanguages = await blog.hreflangMap(slug, LOCALES);
+  return blog.metadata(post, {
+    locale,
+    titleTemplate: 'absolute',
+    alternateLanguages,
+  });
 }
 
-/**
- * Blog post page component
- */
-export default async function BlogPost({ params }: { params: Promise<{ slug: string; locale: string }> }) {
-  const resolvedParams = await params;
-  const { slug, locale } = resolvedParams;
-  const post = await getBlogPost(slug, { locale, config: blogConfig });
+export default async function BlogPost({
+  params,
+}: {
+  params: Promise<{ slug: string; locale: string }>;
+}) {
+  const { slug, locale } = await params;
+  const post = await blog.getOne(slug, { locale });
+  if (!post) notFound();
 
-  if (!post) {
-    notFound();
-  }
-
-  const site = blogConfig.siteUrl?.replace(/\/$/, '') || '';
   const postTitle =
-    (typeof post.frontmatter.title === 'string' && post.frontmatter.title) || post.slug;
+    (typeof post.frontmatter.title === 'string' && post.frontmatter.title) ||
+    post.slug;
 
   const metaItems: { key: string; node: ReactNode }[] = [];
 
@@ -128,19 +113,30 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
     });
   }
 
+  // Locale-aware breadcrumbs.
+  const homeUrl = blog.config.site.siteUrl
+    ? `${blog.config.site.siteUrl}/${locale}`
+    : `/${locale}`;
+  const breadcrumbs = [
+    { name: 'Home', url: homeUrl },
+    { name: 'Blog', url: blog.indexUrl(locale) },
+    { name: postTitle, url: blog.url(slug, locale) },
+  ];
+  const jsonLd = blog.schemaGraph(post, breadcrumbs, {
+    locale,
+    speakable: true,
+  });
+
   return (
     <>
-      <BlogPostSEO
-        post={post}
-        config={blogConfig}
-        breadcrumbs={[
-          { name: 'Home', url: site ? `${site}/${locale}` : `/${locale}` },
-          { name: 'Blog', url: site ? `${site}/${locale}/blogs` : `/${locale}/blogs` },
-          {
-            name: postTitle,
-            url: site ? `${site}/${locale}/blog/${slug}` : `/${locale}/blog/${slug}`,
-          },
-        ]}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(jsonLd)
+            .replace(/</g, '\\u003c')
+            .replace(/>/g, '\\u003e')
+            .replace(/&/g, '\\u0026'),
+        }}
       />
 
       <article className="min-h-screen">

@@ -1,10 +1,4 @@
 import type { ReactNode } from 'react';
-import {
-  getBlogPost,
-  getAllBlogPosts,
-  generateBlogPostMetadata,
-  BlogPostSEO,
-} from '@next-md-blog/core';
 import { MarkdownContent } from '@next-md-blog/core';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
@@ -14,44 +8,32 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { DocsLink } from '@/components/docs-link';
 import { Calendar, User, Clock, FileText } from 'lucide-react';
 import { markdownComponents } from '@/components/markdown';
-import blogConfig from '@/next-md-blog.config';
+import { blog } from '@/next-md-blog.config';
 
-/**
- * Generate static params for all blog posts
- */
 export async function generateStaticParams() {
-  const posts = await getAllBlogPosts();
-  return posts.map((post) => ({
-    slug: post.slug,
-  }));
+  const posts = await blog.getAll();
+  return posts.map((post) => ({ slug: post.slug }));
 }
 
-/**
- * Generate comprehensive SEO metadata for the blog post page
- */
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
   const { slug } = await params;
-  const post = await getBlogPost(slug, { config: blogConfig });
-
-  if (!post) {
-    return {
-      title: 'Post Not Found',
-    };
-  }
-
-  return generateBlogPostMetadata(post, blogConfig) as Metadata;
+  const post = await blog.getOne(slug);
+  if (!post) return { title: 'Post Not Found' };
+  return blog.metadata(post);
 }
 
-/**
- * Blog post page component
- */
-export default async function BlogPost({ params }: { params: Promise<{ slug: string }> }) {
+export default async function BlogPost({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
   const { slug } = await params;
-  const post = await getBlogPost(slug, { config: blogConfig });
-
-  if (!post) {
-    notFound();
-  }
+  const post = await blog.getOne(slug);
+  if (!post) notFound();
 
   const metaItems: { key: string; node: ReactNode }[] = [];
 
@@ -116,9 +98,19 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
     });
   }
 
+  const jsonLd = blog.schemaGraph(post);
+
   return (
     <>
-      <BlogPostSEO post={post} config={blogConfig} />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(jsonLd)
+            .replace(/</g, '\\u003c')
+            .replace(/>/g, '\\u003e')
+            .replace(/&/g, '\\u0026'),
+        }}
+      />
 
       <article className="min-h-screen">
         <div className="container mx-auto px-4 py-8 sm:py-10 max-w-3xl">

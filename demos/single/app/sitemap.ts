@@ -1,8 +1,11 @@
-import { getAllBlogPosts } from '@next-md-blog/core';
-import { getBlogSitemap } from '@next-md-blog/core/next';
-import blogConfig from '../next-md-blog.config';
+import { composeSitemap } from '@next-md-blog/core';
+import { blog, site } from '../next-md-blog.config';
+
+const DEFAULT_LOCALES = [site.defaultLang ?? 'en'] as const;
 
 export default async function sitemap() {
-  const posts = await getAllBlogPosts({ config: blogConfig });
-  return getBlogSitemap(posts, blogConfig);
+  return composeSitemap({
+    collections: [blog],
+    locales: DEFAULT_LOCALES,
+  });
 }

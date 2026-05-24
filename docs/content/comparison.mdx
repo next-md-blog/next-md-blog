@@ -23,8 +23,8 @@ description: How next-md-blog compares to Contentlayer-style pipelines, Velite, 
 flowchart TB
   subgraph nmb["next-md-blog"]
     n1["Markdown on disk"]
-    n2["getBlogPost in RSC"]
-    n3["MarkdownContent + SEO helpers"]
+    n2["collection.getOne in RSC"]
+    n3["MarkdownContent + collection.metadata / schemaGraph"]
     n1 --> n2 --> n3
   end
   subgraph pipe["Many static pipelines"]
