@@ -15,17 +15,54 @@ import {
   resolveCanonicalUrl,
 } from './seo-utils.js';
 
+/** Optional behaviour switches for `generateBlogPostMetadata`. */
+export interface GenerateBlogPostMetadataOptions {
+  /**
+   * Locale segment to inject into the canonical URL (`/{locale}/{segment}/{slug}`).
+   * Also sets `openGraph.locale` and is used to scope hreflang fallbacks.
+   */
+  locale?: string;
+  /**
+   * Controls the final `<title>` value.
+   *  - `"site-suffix"` (default): `"{title} | {siteName}"` — same as 1.0.
+   *  - `"absolute"`: returns `{ absolute: "{title} | {siteName}" }` so a parent
+   *    layout's `title.template` does not double up.
+   *  - `"bare"`: just the post title; let a parent layout's template handle the suffix.
+   *  - A function: receives `{ title, siteName }` and returns the final string.
+   */
+  titleTemplate?:
+    | 'site-suffix'
+    | 'absolute'
+    | 'bare'
+    | ((args: { title: string; siteName: string }) => string);
+  /**
+   * Custom URL builder. Overrides the default `/{locale}/{segment}/{slug}` logic.
+   */
+  urlBuilder?: (args: {
+    canonicalUrl: string | undefined;
+    slug: string;
+    siteUrl: string;
+    locale?: string;
+    config: Config;
+  }) => string;
+  /** Locale-aware hreflang map override. Useful when sibling URLs are computed externally. */
+  alternateLanguages?: Record<string, string>;
+}
+
 /**
- * Generates comprehensive metadata for a blog post
+ * Generates comprehensive metadata for a blog post.
  * @param post - The blog post
  * @param config - SEO configuration
+ * @param options - Locale + URL + title overrides (see {@link GenerateBlogPostMetadataOptions})
  * @returns Metadata object for Next.js
  */
 export function generateBlogPostMetadata(
   post: BlogPost,
-  config?: Config
+  config?: Config,
+  options?: GenerateBlogPostMetadataOptions
 ): Metadata {
   const blogConfig = config || getConfig();
+  const opts = options ?? {};
   
   const {
     siteName = DEFAULT_SITE_NAME,
@@ -42,7 +79,18 @@ export function generateBlogPostMetadata(
   // Title resolution: seoTitle > title > slug
   const baseTitle = resolveFrontmatterField<string>(['title'], fm, post.slug) || post.slug;
   const seoTitle = resolveFrontmatterField<string>(['seoTitle', 'title'], fm, baseTitle) || baseTitle;
-  const pageTitle = `${seoTitle} | ${siteName}`;
+  const titleMode = opts.titleTemplate ?? 'site-suffix';
+  const suffixed = `${seoTitle} | ${siteName}`;
+  let pageTitle: Metadata['title'];
+  if (typeof titleMode === 'function') {
+    pageTitle = titleMode({ title: seoTitle, siteName });
+  } else if (titleMode === 'absolute') {
+    pageTitle = { absolute: suffixed };
+  } else if (titleMode === 'bare') {
+    pageTitle = seoTitle;
+  } else {
+    pageTitle = suffixed;
+  }
 
   // Description resolution: seoDescription > description > excerpt > empty
   const description = resolveFrontmatterField<string>(
@@ -101,15 +149,20 @@ export function generateBlogPostMetadata(
 
   // Canonical URL - supports both absolute and relative URLs
   // Relative URLs will be resolved against siteUrl
-  const canonicalUrl = resolvePostUrlWithConfig(
-    resolveFrontmatterField<string>(['canonicalUrl'], fm),
-    post.slug,
-    siteUrl,
-    blogConfig
-  );
+  const fmCanonical = resolveFrontmatterField<string>(['canonicalUrl'], fm);
+  const canonicalUrl = opts.urlBuilder
+    ? opts.urlBuilder({
+        canonicalUrl: fmCanonical,
+        slug: post.slug,
+        siteUrl,
+        ...(opts.locale ? { locale: opts.locale } : {}),
+        config: blogConfig,
+      })
+    : resolvePostUrlWithConfig(fmCanonical, post.slug, siteUrl, blogConfig, opts.locale);
 
-  // Language
-  const lang = resolveFrontmatterField<string>(['lang'], fm) || defaultLang;
+  // Language: explicit option > frontmatter.lang > config.defaultLang
+  const lang =
+    opts.locale || resolveFrontmatterField<string>(['lang'], fm) || defaultLang;
 
   // Robots meta
   const robots = buildRobotsMeta(fm);
@@ -147,10 +200,10 @@ export function generateBlogPostMetadata(
     }
   });
 
-  // Build alternates object
+  // Build alternates object — explicit option > frontmatter > config.
   const alternates: { canonical?: string; languages?: Record<string, string> } = {};
   if (canonicalUrl) alternates.canonical = canonicalUrl;
-  const hreflang = resolveHreflangMap(fm, blogConfig);
+  const hreflang = opts.alternateLanguages ?? resolveHreflangMap(fm, blogConfig);
   if (hreflang && Object.keys(hreflang).length > 0) {
     alternates.languages = siteUrl
       ? Object.fromEntries(
