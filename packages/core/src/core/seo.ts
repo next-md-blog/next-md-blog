@@ -10,13 +10,17 @@ export {
   generateBlogPostMetadata,
   generateBlogListMetadata,
 } from './seo-metadata.js';
+export type { GenerateBlogPostMetadataOptions } from './seo-metadata.js';
 
 export {
   generateBlogPostSchema,
   generateBreadcrumbsSchema,
   generateBlogPostSchemaGraph,
 } from './seo-schema.js';
-export type { BlogPostSchemaOptions } from './seo-schema.js';
+export type {
+  BlogPostSchemaOptions,
+  BlogPostSchemaGraphOptions,
+} from './seo-schema.js';
 
 export { generateRSSFeed } from './seo-feeds.js';
 
