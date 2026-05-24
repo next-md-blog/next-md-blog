@@ -163,6 +163,7 @@ export default async function BlogPost({
 
           <div className="rounded-2xl border border-border/80 bg-card/60 backdrop-blur-sm shadow-sm px-5 py-8 sm:px-10 sm:py-10">
             <div className="prose prose-lg dark:prose-invert max-w-none prose-headings:scroll-mt-24">
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
               <MarkdownContent content={post.content} components={markdownComponents as any} />
             </div>
           </div>
