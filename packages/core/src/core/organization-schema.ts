@@ -61,8 +61,23 @@ export function buildOrganizationNode(config?: Config): Record<string, unknown> 
       url: org.logo,
     };
   }
-  if (org?.sameAs && org.sameAs.length > 0) {
-    node.sameAs = org.sameAs.length === 1 ? org.sameAs[0] : org.sameAs;
+  if (org?.foundingDate) node.foundingDate = org.foundingDate;
+  if (org?.founder) {
+    node.founder = { '@type': 'Person', name: org.founder };
+  }
+  if (org?.address && Object.values(org.address).some(Boolean)) {
+    node.address = { '@type': 'PostalAddress', ...org.address };
+  }
+  if (org?.contactPoint && Object.values(org.contactPoint).some(Boolean)) {
+    node.contactPoint = { '@type': 'ContactPoint', ...org.contactPoint };
+  }
+  // Merge wikidata into sameAs (deduplicated).
+  const sameAsList = [
+    ...(org?.sameAs ?? []),
+    ...(org?.wikidata ? [org.wikidata] : []),
+  ].filter((v, i, arr) => arr.indexOf(v) === i);
+  if (sameAsList.length > 0) {
+    node.sameAs = sameAsList.length === 1 ? sameAsList[0] : sameAsList;
   }
 
   return node;

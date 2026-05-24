@@ -141,34 +141,40 @@ export function getBlogPostPathSegment(config?: Config): string {
 
 /**
  * Resolves a post URL from canonical URL or generates default `/{segment}/{slug}` under siteUrl.
+ * When `locale` is provided, builds `/{locale}/{segment}/{slug}` (skipped when a canonicalUrl is set).
  */
 export function resolvePostUrl(
   canonicalUrl: string | undefined,
   slug: string,
   siteUrl: string,
-  blogPostPathSegment = 'blog'
+  blogPostPathSegment = 'blog',
+  locale?: string
 ): string {
   const seg = blogPostPathSegment.replace(/^\/+|\/+$/g, '') || 'blog';
   const base = siteUrl.replace(/\/$/, '');
-  const urlRaw =
-    canonicalUrl || (base ? `${base}/${seg}/${slug}` : `/${seg}/${slug}`);
+  const localePrefix = locale ? `/${locale.replace(/^\/+|\/+$/g, '')}` : '';
+  const path = `${localePrefix}/${seg}/${slug}`;
+  const urlRaw = canonicalUrl || (base ? `${base}${path}` : path);
   return siteUrl ? resolveCanonicalUrl(urlRaw, siteUrl) : urlRaw;
 }
 
 /**
  * Resolves post URL using optional blog config for path segment.
+ * Pass `locale` to prefix the URL with the locale segment.
  */
 export function resolvePostUrlWithConfig(
   canonicalUrl: string | undefined,
   slug: string,
   siteUrl: string,
-  config?: Config
+  config?: Config,
+  locale?: string
 ): string {
   return resolvePostUrl(
     canonicalUrl,
     slug,
     siteUrl,
-    getBlogPostPathSegment(config)
+    getBlogPostPathSegment(config),
+    locale
   );
 }
 

@@ -1,4 +1,29 @@
 /**
+ * Postal address (Schema.org PostalAddress).
+ */
+export interface PostalAddress {
+  streetAddress?: string;
+  addressLocality?: string;
+  addressRegion?: string;
+  postalCode?: string;
+  addressCountry?: string;
+}
+
+/**
+ * Contact point (Schema.org ContactPoint). Used for Organization JSON-LD.
+ */
+export interface ContactPoint {
+  email?: string;
+  telephone?: string;
+  /** e.g. "customer support", "sales", "press". */
+  contactType?: string;
+  /** ISO country codes (e.g. ["US", "FR"]) or region names. */
+  areaServed?: string | string[];
+  /** BCP-47 codes (e.g. ["en", "fr"]). */
+  availableLanguage?: string | string[];
+}
+
+/**
  * Publisher / Organization fields for JSON-LD (extends siteName + siteUrl).
  */
 export interface SiteOrganization {
@@ -10,6 +35,16 @@ export interface SiteOrganization {
   logo?: string;
   /** Official profiles (Schema.org sameAs) */
   sameAs?: string[];
+  /** ISO date string. */
+  foundingDate?: string;
+  /** Founder name (rendered as Person). */
+  founder?: string;
+  /** PostalAddress fields. */
+  address?: PostalAddress;
+  /** ContactPoint fields. */
+  contactPoint?: ContactPoint;
+  /** Wikidata entity URL (e.g. https://www.wikidata.org/wiki/Q1234567). Auto-merged into sameAs. */
+  wikidata?: string;
 }
 
 /**
@@ -79,6 +114,20 @@ export interface BlogPostFrontmatter {
   readingTime?: number;
   /** Per-post hreflang map (overrides config.alternateLanguages for this post) */
   alternateLanguages?: Record<string, string>;
+  /** Last-updated date. Drives `dateModified` in JSON-LD and `lastmod` in sitemaps. */
+  updated?: string;
+  /** Topic-cluster identifier. Posts sharing the same series belong to the same pillar. */
+  series?: string;
+  /** Display name for the series pillar page (defaults to humanized series slug). */
+  seriesTitle?: string;
+  /** Sort order within a series (lower first). Falls back to date when absent. */
+  seriesOrder?: number;
+  /** E-E-A-T: editor / reviewer who validated the post. */
+  reviewedBy?: string;
+  /** E-E-A-T: fact-checker. */
+  factCheckedBy?: string;
+  /** E-E-A-T: date of last editorial review (yyyy-mm-dd). */
+  lastReviewed?: string;
   [key: string]: unknown;
 }
 
