@@ -137,6 +137,11 @@ export default async function RootLayout({
           {children}
         </Layout>
         <Analytics />
+        <script
+          src="https://analytics.ahrefs.com/analytics.js"
+          data-key="5zrwVqVGDgnaYUDWu2Hp0Q"
+          async
+        />
       </body>
     </html>
   );
