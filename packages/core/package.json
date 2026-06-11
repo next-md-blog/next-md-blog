@@ -1,6 +1,6 @@
 {
   "name": "@next-md-blog/core",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "A React library for parsing and displaying markdown blog posts in Next.js",
   "type": "module",
   "main": "dist/index.js",
@@ -81,6 +81,12 @@
   "peerDependencies": {
     "next": "^16.2.0",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "mermaid": "^11.0.0"
+  },
+  "peerDependenciesMeta": {
+    "mermaid": {
+      "optional": true
+    }
   }
 }
