@@ -56,7 +56,7 @@
   },
   "dependencies": {
     "@tailwindcss/typography": "^0.5.19",
-    "gray-matter": "^4.0.3",
+    "js-yaml": "^4.2.0",
     "react-markdown": "^10.1.0",
     "rehype-react": "^8.0.0",
     "remark": "^15.0.1",
