@@ -10,7 +10,7 @@ import type { MetadataRoute } from 'next';
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
-import matter from 'gray-matter';
+import { parseFrontmatter } from './frontmatter.js';
 
 import type {
   BlogPostFrontmatter,
@@ -323,7 +323,7 @@ function parseDoc<TFrontmatter extends BaseFrontmatter>(
   const fileContents = readFileSafe(filePath);
   if (fileContents === null) throw new BlogPostNotFoundError(slug);
   try {
-    const { data: frontmatter, content } = matter(fileContents);
+    const { data: frontmatter, content } = parseFrontmatter(fileContents);
     validateContent(content);
     const trimmedContent = content.trim();
     const validated = validateFrontmatter(frontmatter);
@@ -720,7 +720,7 @@ export function defineCollection<
           const filePath = path.join(dir, file);
           const fileContents = readFileSafe(filePath);
           if (fileContents === null) continue;
-          const { data: frontmatter } = matter(fileContents);
+          const { data: frontmatter } = parseFrontmatter(fileContents);
           const validated = validateFrontmatter(frontmatter);
           const authors = normalizeAuthors(
             validated.author as string | string[] | undefined,
