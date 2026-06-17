@@ -97,6 +97,32 @@ You still add **one optional** blog-wide config file for site URL, default autho
 
 See the full **[Comparison](/comparison)** page for stack-by-stack notes.
 
+## Frequently asked questions
+
+### How do I build a Markdown blog in Next.js?
+
+Install [`@next-md-blog/core`](https://www.npmjs.com/package/@next-md-blog/core), keep your posts as `.md` / `.mdx` files on disk, declare a collection with `defineCollection`, and render it with `MarkdownContent` from a Server Component. The optional [CLI](/cli) scaffolds the routes, config, and SEO files for you. See [Getting started](/getting-started).
+
+### Does next-md-blog work with the Next.js App Router?
+
+Yes — it is App Router–native. You read posts inside React Server Components and route handlers; there is no separate runtime CMS or client-side data layer for file-based blogs. It targets **Next.js `^16`** and **React `^19`**.
+
+### Can I write posts in MDX?
+
+Yes. Both `.md` and `.mdx` are supported, so you can mix plain Markdown with React components in the same content folder.
+
+### Do I need a database or headless CMS?
+
+No. Posts live as Markdown files in your repository and metadata lives in each file's frontmatter — there is no database, no sidecar `post.json`, and no generated content manifest to keep in sync. See [Comparison](/comparison) for how this differs from CMS-backed and codegen-based stacks.
+
+### Does it handle SEO, sitemap, RSS, and JSON-LD?
+
+Yes. The core library ships metadata, JSON-LD (`schemaGraph`), RSS/Atom feeds, `sitemap`, `robots`, and `llms.txt` helpers, and the CLI can generate the matching routes. See [SEO & feeds](/seo-and-feeds).
+
+### Does it support internationalization (i18n)?
+
+Yes — locale segments and per-locale content folders are supported. See [Internationalization](/internationalization) and the [i18n demo](https://demo.i18n.next-md-blog.com).
+
 ## Where to go next
 
 - [Getting started](/getting-started) — install, CLI, first routes
