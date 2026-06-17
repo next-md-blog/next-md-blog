@@ -54,6 +54,24 @@ flowchart TB
 - You want **Server Components** and normal **App Router** files, not a framework inside the framework.
 - You prefer **one file per post** and **minimal moving parts** over maximum generated type safety from a pipeline.
 
+## Quick answers
+
+### next-md-blog vs Contentlayer
+
+Contentlayer compiled your Markdown into generated types and a `.contentlayer` cache via a required build step, and the original project is no longer actively maintained. next-md-blog has **no required codegen and no generated cache** — it reads Markdown from disk in Server Components and keeps frontmatter as the only per-post metadata surface.
+
+### next-md-blog vs Velite
+
+Velite is a modern "build step → typed content" tool: you run `velite build` to emit typed `data/*` modules. Choose **Velite** for strict generated schemas and maximal type safety; choose **next-md-blog** if you'd rather skip the extra build artifact and read files directly with built-in SEO, RSS, and sitemap helpers.
+
+### next-md-blog vs next-mdx-remote
+
+next-mdx-remote renders MDX **strings** (e.g. from a database) and leaves storage, metadata, and SEO to you. next-md-blog is filesystem-first and batteries-included — pick next-mdx-remote when content lives remotely or you want the smallest possible abstraction.
+
+### next-md-blog vs a headless CMS
+
+A headless CMS (Sanity, Payload, Contentful) is the better fit when **non-developers publish daily** and need dashboards, previews, and roles. next-md-blog keeps content in git with a PR-based workflow — ideal for developer-owned blogs and docs.
+
 ## When to consider something else
 
 - **Velite / similar** if you want **generated `data/*.json` or TS modules**, strict schemas, and a single `velite build` as the source of typed content — at the cost of an extra build step and output artifacts.
