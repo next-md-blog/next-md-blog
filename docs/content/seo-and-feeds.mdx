@@ -5,7 +5,7 @@ description: Generate page metadata, JSON-LD structured data, an XML sitemap, RS
 
 # SEO & feeds
 
-Every SEO surface in v1.2 lives on the `Collection` object you got back from `defineCollection`. Site-wide aggregation (sitemap, llms.txt) is done with `composeSitemap` / `composeLlmsTxt`.
+Every SEO surface lives on the `Collection` object you got back from `defineCollection` (the collection API, introduced in v1.2). Site-wide aggregation (sitemap, llms.txt) is done with `composeSitemap` / `composeLlmsTxt`.
 
 ## Per-page metadata
 
@@ -41,6 +41,16 @@ const jsonLd = blog.schemaGraph(post, undefined, { locale, speakable: true });
 - `schema(doc, opts?)` returns just the doc schema (no Organization or breadcrumbs).
 - `breadcrumbsSchema(doc, breadcrumbs?, opts?)` returns just the `BreadcrumbList`.
 - Pass `opts.extend` to mutate the doc node freely.
+
+### FAQPage & HowTo (since v1.3)
+
+If a post's frontmatter has **`faq`** or **`howto`**, `schemaGraph` automatically appends a Schema.org **`FAQPage`** and/or **`HowTo`** node to the `@graph` — nothing else to call. See [Content & frontmatter](/content-and-frontmatter#faq-and-howto-structured-data-since-v13) for the frontmatter shapes.
+
+```tsx
+// post.frontmatter.faq / .howto set → graph includes FAQPage / HowTo
+const jsonLd = blog.schemaGraph(post);
+// → { "@graph": [Organization, BlogPosting, BreadcrumbList, FAQPage, HowTo] }
+```
 
 Inline a sanitized `<script type="application/ld+json">` yourself:
 

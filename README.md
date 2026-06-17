@@ -6,9 +6,11 @@ A React library for parsing and displaying **Markdown** and **MDX** blog posts i
 
 ## Features
 
+- **Collections** — Declare one collection per content surface (blog, glossary, docs, changelog, …) with `defineCollection`; a shared `defineSite` holds site-wide concerns
 - **Markdown and MDX** — Frontmatter metadata in the same file as the post; GitHub-flavored markdown via the rendering pipeline
+- **Mermaid diagrams** — Fenced ` ```mermaid ` blocks render as diagrams when the optional `mermaid` peer is installed
 - **Server Components** — Designed for the App Router; load posts in RSC route handlers
-- **SEO** — Helpers for Next.js `Metadata`, Open Graph, Twitter cards, JSON-LD (`BlogPosting`), RSS, and sitemaps
+- **SEO** — Helpers for Next.js `Metadata`, Open Graph, Twitter cards, JSON-LD (`Organization`, `BlogPosting`, `BreadcrumbList`, plus `FAQPage` / `HowTo` from frontmatter), RSS, sitemaps, and `llms.txt`
 - **OG images** — CLI can add `opengraph-image` routes; optional `OgImage` building block from core
 - **TypeScript** — Typed config, posts, and frontmatter
 - **CLI** — `npx @next-md-blog/cli` for posts folder, sample post, config, blog routes, **sitemap.ts / robots.ts / feed.xml** (under `app/` or `src/app/`); **`npx @next-md-blog/cli seo`** to add or update SEO routes only; **`--force`** to overwrite
@@ -20,7 +22,7 @@ A React library for parsing and displaying **Markdown** and **MDX** blog posts i
 npm install @next-md-blog/core
 ```
 
-Peers: **Next.js 16+**, **React 19+**.
+Peers: **Next.js 16+**, **React 19+**. Optional: **`mermaid` 11+** (only needed to render ` ```mermaid ` diagram blocks).
 
 ## Quick start
 
@@ -63,34 +65,39 @@ Create `.md` or `.mdx` files under your content directory (often `posts/`). The 
 
 ```tsx
 // next-md-blog.config.ts
-import { createConfig } from '@next-md-blog/core';
+import { defineSite, defineCollection } from '@next-md-blog/core';
 
-export default createConfig({
+export const site = defineSite({
   siteName: 'My Blog',
   siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? 'https://example.com',
   defaultAuthor: 'Your Name',
   twitterHandle: '@yourhandle',
   defaultLang: 'en',
 });
+
+export const blog = defineCollection({
+  id: 'blog',
+  contentDir: 'posts',
+  pathSegment: 'blog',
+  indexPath: '/blogs',
+  site,
+});
 ```
 
 ## App Router example
 
+Content-related calls are methods on the collection you exported from `next-md-blog.config.ts`.
+
 **`app/blog/[slug]/page.tsx`** (Next.js 16 async request APIs):
 
 ```tsx
-import {
-  getBlogPost,
-  getAllBlogPosts,
-  generateBlogPostMetadata,
-  MarkdownContent,
-} from '@next-md-blog/core';
+import { MarkdownContent } from '@next-md-blog/core';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import blogConfig from '@/next-md-blog.config';
+import { blog } from '@/next-md-blog.config';
 
 export async function generateStaticParams() {
-  const posts = await getAllBlogPosts({ config: blogConfig });
+  const posts = await blog.getAll();
   return posts.map((post) => ({ slug: post.slug }));
 }
 
@@ -100,9 +107,9 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const post = await getBlogPost(slug, { config: blogConfig });
+  const post = await blog.getOne(slug);
   if (!post) return { title: 'Post Not Found' };
-  return generateBlogPostMetadata(post, blogConfig) as Metadata;
+  return blog.metadata(post);
 }
 
 export default async function BlogPostPage({
@@ -111,7 +118,7 @@ export default async function BlogPostPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const post = await getBlogPost(slug, { config: blogConfig });
+  const post = await blog.getOne(slug);
   if (!post) notFound();
 
   return (
@@ -126,18 +133,11 @@ export default async function BlogPostPage({
 **`app/blogs/page.tsx`** (listing):
 
 ```tsx
-import { getAllBlogPosts, generateBlogListMetadata } from '@next-md-blog/core';
 import Link from 'next/link';
-import type { Metadata } from 'next';
-import blogConfig from '@/next-md-blog.config';
-
-export async function generateMetadata(): Promise<Metadata> {
-  const posts = await getAllBlogPosts({ config: blogConfig });
-  return generateBlogListMetadata(posts, blogConfig) as Metadata;
-}
+import { blog } from '@/next-md-blog.config';
 
 export default async function BlogsPage() {
-  const posts = await getAllBlogPosts({ config: blogConfig });
+  const posts = await blog.getAll();
 
   return (
     <div>
@@ -167,12 +167,14 @@ export default async function BlogsPage() {
 | `tags` | `string[]` | Tags |
 | `ogImage` | `string` | Custom OG image URL |
 | `image` | `string` | Featured image / OG fallback |
+| `faq` | `FaqItem[]` | Emits Schema.org `FAQPage` JSON-LD |
+| `howto` | `HowToFrontmatter` | Emits Schema.org `HowTo` JSON-LD |
 
-Extra keys remain on `frontmatter` for your own use. Full conventions: [Content & frontmatter](https://www.next-md-blog.com/content-and-frontmatter).
+Extra keys remain on `frontmatter` for your own use. Full conventions (including E-E-A-T, series, and structured-data fields): [Content & frontmatter](https://www.next-md-blog.com/content-and-frontmatter).
 
 ## SEO and OG images
 
-Use **`generateBlogPostMetadata`**, **`generateBlogListMetadata`**, **`BlogPostSEO`**, **`getBlogSitemap`** / **`getBlogRobots`** / **`createRssFeedResponse`** (from `@next-md-blog/core` or `@next-md-blog/core/next`), etc., as shown in the [docs](https://www.next-md-blog.com/seo-and-feeds). The CLI scaffolds **`sitemap.ts`**, **`robots.ts`**, and **`feed.xml/route.ts`** on init, or via **`npx @next-md-blog/cli seo`**.
+Per-collection methods cover metadata and feeds — **`blog.metadata(post)`**, **`blog.schemaGraph(post)`** (JSON-LD `@graph`), **`blog.rssResponse()`** — and site-wide helpers compose them: **`composeSitemap`**, **`composeLlmsTxt`** (from `@next-md-blog/core`) and **`getRobots(site)`** (from `@next-md-blog/core/next`). See the [SEO & feeds docs](https://www.next-md-blog.com/seo-and-feeds). The CLI scaffolds **`sitemap.ts`**, **`robots.ts`**, and **`feed.xml/route.ts`** on init, or via **`npx @next-md-blog/cli seo`**.
 
 For dynamic OG images, the CLI can add `app/blog/[slug]/opengraph-image.tsx` using `next/og`’s **`ImageResponse`**. You can also compose visuals with the **`OgImage`** component from core (see package exports and [API reference](https://www.next-md-blog.com/api-reference)).
 
@@ -224,14 +226,12 @@ Root **`pnpm build`** builds packages, docs, and **both demo apps**. From the re
 
 ## Advanced usage
 
-Custom content directory and locale:
+The content directory is set once on the collection (`defineCollection({ contentDir })`); pass a `locale` per call to read from a locale subfolder:
 
 ```tsx
-const post = await getBlogPost('welcome', {
-  config: blogConfig,
-  postsDir: 'content/blog',
-  locale: 'en',
-});
+import { blog } from '@/next-md-blog.config';
+
+const post = await blog.getOne('welcome', { locale: 'en' });
 ```
 
 Custom **`remarkPlugins`** / **`rehypePlugins`** on **`MarkdownContent`** are supported; use trusted plugins only—see the [API reference](https://www.next-md-blog.com/api-reference).
