@@ -5,7 +5,7 @@ description: Public API of @next-md-blog/core and @next-md-blog/core/next — co
 
 # API reference
 
-The 1.2 surface is organized around `defineCollection`. Site-wide helpers (Organization JSON-LD, robots, sitemap composition) take a `SiteConfig`.
+The public surface is organized around `defineCollection`. Site-wide helpers (Organization JSON-LD, robots, sitemap composition) take a `SiteConfig`.
 
 ## `@next-md-blog/core`
 
@@ -71,7 +71,8 @@ A `Collection<T>` exposes:
 
 ### Components
 
-- **`<MarkdownContent />`** — React Server Component that renders a `BlogPost.content` string. Accepts `components`, `remarkPlugins`, `rehypePlugins`.
+- **`<MarkdownContent />`** — React Server Component that renders a `BlogPost.content` string. Accepts `components`, `remarkPlugins`, `rehypePlugins`. Fenced ` ```mermaid ` blocks render as diagrams when the optional `mermaid` peer (`^11`) is installed (see [Content & frontmatter](/content-and-frontmatter#mermaid-diagrams-since-v14)).
+- **`defaultMarkdownComponents`** — the default element map used by `MarkdownContent`; merge overrides via the `components` prop.
 - **`<OgImage />`** — opinionated layout for `next/og` Open Graph images. Pair with `app/[…]/opengraph-image.tsx`.
 
 ### Errors
@@ -88,6 +89,7 @@ A `Collection<T>` exposes:
 - **`SiteConfig`**, **`SiteOrganization`**, **`PostalAddress`**, **`ContactPoint`**, **`Author`**
 - **`CollectionConfig<T>`**, **`Collection<T>`**, **`ResolvedCollectionConfig<T>`**, **`CollectionDefaults`**, **`RssOptions`**
 - **`ContentDoc<T>`**, **`ContentMetadata<T>`**, **`BaseFrontmatter`**, **`BlogPostFrontmatter`**
+- **`FaqItem`**, **`HowToFrontmatter`**, **`HowToStepFrontmatter`** (FAQPage / HowTo JSON-LD from frontmatter)
 - **`Breadcrumb`**, **`ReadOptions`**, **`MetadataOptions`**, **`SchemaOptions`**, **`SchemaGraphOptions`**
 - **`SchemaBuilder<T>`**, **`SchemaBuilderContext<T>`**
 - **`ComposeSitemapOptions`**, **`ComposeLlmsTxtOptions`**, **`WebsiteSchemaOptions`**
