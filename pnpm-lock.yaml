@@ -190,6 +190,9 @@ importers:
       react-dom:
         specifier: ^19.2.4
         version: 19.2.4(react@19.2.4)
+      trailic:
+        specifier: https://github.com/trailic/trailic/releases/download/v0.1.1/trailic-0.1.1.tgz
+        version: https://github.com/trailic/trailic/releases/download/v0.1.1/trailic-0.1.1.tgz(react@19.2.4)
     devDependencies:
       '@types/node':
         specifier: ^22.19.15
@@ -5033,6 +5036,12 @@ packages:
   to-regex-range@5.0.1:
     resolution: {integrity: sha512-65P7iz6X5yEr1cwcgvQxbbIw7Uk3gOy5dIdtZ4rDveLqhrdJP+Li/Hx6tyK0NEb+2GCyneCMJiGqrADCSNk8sQ==}
     engines: {node: '>=8.0'}
+
+  trailic@https://github.com/trailic/trailic/releases/download/v0.1.1/trailic-0.1.1.tgz:
+    resolution: {tarball: https://github.com/trailic/trailic/releases/download/v0.1.1/trailic-0.1.1.tgz}
+    version: 0.1.1
+    peerDependencies:
+      react: '>=18'
 
   traverse@0.6.8:
     resolution: {integrity: sha512-aXJDbk6SnumuaZSANd21XAo15ucCDE38H4fkqiGsc3MhCK+wOlZvLP9cB/TvpHT0mOyWgC4Z8EwRlzqYSUzdsA==}
@@ -10975,6 +10984,10 @@ snapshots:
   to-regex-range@5.0.1:
     dependencies:
       is-number: 7.0.0
+
+  trailic@https://github.com/trailic/trailic/releases/download/v0.1.1/trailic-0.1.1.tgz(react@19.2.4):
+    dependencies:
+      react: 19.2.4
 
   traverse@0.6.8: {}
 
