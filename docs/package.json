@@ -10,13 +10,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@borromic/analytics": "^0.1.0",
     "@vercel/analytics": "^2.0.1",
     "next": "^16.2.1",
     "nextra": "^4.6.1",
     "nextra-theme-docs": "^4.6.1",
     "react": "^19.2.4",
-    "react-dom": "^19.2.4",
-    "trailic": "https://github.com/trailic/trailic/releases/download/v0.1.1/trailic-0.1.1.tgz"
+    "react-dom": "^19.2.4"
   },
   "devDependencies": {
     "@types/node": "^22.19.15",
