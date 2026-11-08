@@ -47,6 +47,15 @@ export {
   authorNamesFromFrontmatter,
 } from './core/collection.js';
 
+// Content sources (filesystem default, GitHub, or custom)
+export { fsSource, githubSource } from './core/sources/index.js';
+export type {
+  ContentSource,
+  ContentSourceTransformContext,
+  FsSourceOptions,
+  GitHubSourceOptions,
+} from './core/sources/index.js';
+
 // Composition
 export {
   composeSitemap,
@@ -82,6 +91,8 @@ export {
   BlogPostNotFoundError,
   FileReadError,
   DirectoryError,
+  ContentSourceError,
+  GitHubRateLimitError,
 } from './core/errors.js';
 
 // Utilities

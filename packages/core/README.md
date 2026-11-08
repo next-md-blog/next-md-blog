@@ -68,6 +68,10 @@ export default function robots() {
 }
 ```
 
+## Remote sources (GitHub)
+
+Collections read the filesystem by default; pass `source: githubSource({ owner, repo, path: 'docs', revalidate: 3600 })` to `defineCollection` to render Markdown from a GitHub repository (token from `GITHUB_TOKEN`, relative links / images rewritten, typed rate-limit errors). See [Remote sources](https://www.next-md-blog.com/remote-sources).
+
 ## Links
 
 - [npm](https://www.npmjs.com/package/@next-md-blog/core)

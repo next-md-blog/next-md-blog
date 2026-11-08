@@ -57,6 +57,11 @@ A `Collection<T>` exposes:
 - **`llmsTxtSection(opts: { locales, defaultLocale? }): Promise<string>`** — markdown section for [llmstxt.org](https://llmstxt.org).
 - **`llmsFullTxtSection(opts: { locales }): Promise<string>`** — concatenated post bodies.
 
+### Content sources
+
+- **`fsSource(opts?): ContentSource`** — local filesystem (the default `source` of every collection). `opts.root` overrides `process.cwd()`.
+- **`githubSource(opts): ContentSource`** — Markdown from a GitHub repository folder, with Next.js fetch caching and relative-URL rewriting. See [Remote sources](/remote-sources).
+
 ### Composition
 
 - **`composeSitemap({ collections, locales, staticEntries? }): Promise<MetadataRoute.Sitemap>`** — merges static rows with every collection's sitemap rows.
@@ -78,6 +83,7 @@ A `Collection<T>` exposes:
 ### Errors
 
 - **`MdxBlogError`** (base), **`BlogPostNotFoundError`**, **`FileReadError`**, **`DirectoryError`**.
+- **`ContentSourceError`** (remote source failures: `status`, `source`), **`GitHubRateLimitError`** (`resetAt`, `limit`).
 
 ## `@next-md-blog/core/next`
 
@@ -92,4 +98,5 @@ A `Collection<T>` exposes:
 - **`FaqItem`**, **`HowToFrontmatter`**, **`HowToStepFrontmatter`** (FAQPage / HowTo JSON-LD from frontmatter)
 - **`Breadcrumb`**, **`ReadOptions`**, **`MetadataOptions`**, **`SchemaOptions`**, **`SchemaGraphOptions`**
 - **`SchemaBuilder<T>`**, **`SchemaBuilderContext<T>`**
+- **`ContentSource`**, **`ContentSourceTransformContext`**, **`FsSourceOptions`**, **`GitHubSourceOptions`**
 - **`ComposeSitemapOptions`**, **`ComposeLlmsTxtOptions`**, **`WebsiteSchemaOptions`**

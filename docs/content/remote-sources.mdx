@@ -1,0 +1,159 @@
+---
+title: Remote sources (GitHub)
+description: Render Markdown that lives in other GitHub repositories — githubSource reads a repo's docs/ folder at build or request time, rewrites relative links and images, and plugs into defineCollection.
+---
+
+# Remote sources (GitHub)
+
+Since v1.5 a collection can read its Markdown from somewhere other than the local filesystem. Pass a **`source`** to `defineCollection`:
+
+- **`fsSource()`** — the default; reads `contentDir` relative to `process.cwd()` (unchanged behavior).
+- **`githubSource({ owner, repo, ... })`** — reads a directory of a GitHub repository.
+- Any object implementing the [`ContentSource`](#custom-sources) interface.
+
+The collection API stays the same: every data method (`getAll`, `getOne`, `getInAllLocales`, `sitemapEntries`, …) was already async, so switching sources is a config change only.
+
+## Docs from several repositories
+
+A typical setup: a product site that renders each component repository's `docs/` folder under its own route.
+
+```ts filename="next-md-blog.config.ts"
+import {
+  defineSite,
+  defineCollection,
+  githubSource,
+  type Collection,
+} from '@next-md-blog/core';
+
+export const site = defineSite({
+  siteName: 'Synthaea',
+  siteUrl: 'https://synthaea.example',
+});
+
+const repos = ['edr-agent', 'edr-server', 'edr-console'] as const;
+
+export const repoDocs: Record<string, Collection> = Object.fromEntries(
+  repos.map((repo) => [
+    repo,
+    defineCollection({
+      id: `${repo}-docs`,
+      pathSegment: `docs/${repo}`,       // → /docs/edr-agent/<slug>
+      label: repo,
+      schemaType: 'TechArticle',
+      rss: false,
+      site,
+      source: githubSource({
+        owner: 'synthaea-lab',
+        repo,
+        path: 'docs',                    // folder inside the repo (default)
+        ref: 'main',                     // branch, tag or SHA (default: default branch)
+        revalidate: 3600,                // refetch at most hourly (ISR)
+        // token: process.env.GITHUB_TOKEN  (the default)
+      }),
+    }),
+  ]),
+);
+```
+
+Remote docs are usually nested (`docs/guides/install.md`), so slugs can contain `/` (`guides/install`). Use a **catch-all** route:
+
+```tsx filename="app/docs/[repo]/[...slug]/page.tsx"
+import { notFound } from 'next/navigation';
+import { MarkdownContent } from '@next-md-blog/core';
+import { repoDocs } from '@/next-md-blog.config';
+
+type Params = { repo: string; slug: string[] };
+
+export const revalidate = 3600;
+
+export async function generateStaticParams() {
+  const params: Params[] = [];
+  for (const [repo, docs] of Object.entries(repoDocs)) {
+    for (const slug of await docs.getAllSlugs()) {
+      params.push({ repo, slug: slug.split('/') });
+    }
+  }
+  return params;
+}
+
+export default async function Page({ params }: { params: Promise<Params> }) {
+  const { repo, slug } = await params;
+  const docs = repoDocs[repo];
+  const doc = docs ? await docs.getOne(slug.join('/')) : null;
+  if (!doc) notFound();
+  return (
+    <article>
+      <h1>{doc.frontmatter.title}</h1>
+      <MarkdownContent content={doc.content} />
+    </article>
+  );
+}
+```
+
+## What `githubSource` does
+
+- **Listing** — one `GET /repos/{owner}/{repo}/git/trees/{ref}?recursive=1` call per repository (cached), filtered to `path`.
+- **Reading** — file bodies come from `raw.githubusercontent.com` at the same `ref` (does not consume the REST API quota). Files that are not in the tree return `null` without a request.
+- **Caching** — every request passes `next: { revalidate, tags: ['next-md-blog:github:<owner>/<repo>'] }` to `fetch`, so Next.js' data cache and `revalidateTag()` apply. An in-memory cache (TTL = `revalidate`, or the process lifetime when unset) avoids refetching the same file during a build.
+- **Frontmatter is optional** — when a document has no `title`, it is taken from the first `# H1`, else from the file name (`getting-started.md` → “Getting started”; `guides/README.md` → “Guides”). The H1 stays in the body.
+- **Relative URLs are rewritten** in `getOne()` content:
+  - images (`![](img/arch.png)`, `<img src>`) → `https://raw.githubusercontent.com/<owner>/<repo>/<ref>/docs/img/arch.png`
+  - links to other Markdown files of the same collection → the collection URL (`collection.url(slug, locale)`), anchors preserved
+  - any other relative link (source files, files outside `path`, other locales) → `https://github.com/<owner>/<repo>/blob/<ref>/...`
+  - absolute URLs, `#anchors` and code (fenced blocks, inline code) are left untouched.
+
+### Options
+
+| Option | Purpose | Default |
+|---|---|---|
+| `owner`, `repo` | Repository | required |
+| `ref` | Branch, tag or commit SHA | `HEAD` (default branch) |
+| `path` | Folder inside the repo used as the source root (`''` = repo root) | `'docs'` |
+| `token` | GitHub token (private repos, 5,000 req/h). Only sent as an `Authorization` header, never logged | `process.env.GITHUB_TOKEN` |
+| `revalidate` | Seconds; forwarded to `fetch` (`next.revalidate`) and used as in-memory TTL. `false` = cache forever | unset |
+| `recursive` | Include nested folders (slugs like `guides/install`) | `true` |
+| `links` | `'site'`: links to sibling docs go to the collection route; `'github'`: always to GitHub | `'site'` |
+| `rewriteUrls` | Rewrite relative links / images | `true` |
+| `inferTitle` | Derive `title` from the first H1 / file name | `true` |
+| `cache` | In-memory cache of the tree and file bodies | `true` |
+| `fetch` | Custom `fetch` implementation | global `fetch` |
+
+With a remote source, `contentDir` is optional and relative to `path` (default `''`).
+
+### Locales
+
+Locales work exactly like the filesystem: `getAll({ locale: 'fr' })` reads `${contentDir}/fr` under the source root — e.g. `docs/fr/*.md` in the repository. Without a `locale`, a recursive source lists the whole `path`, including locale folders; set `contentDir` (or use `locale`) to scope it.
+
+### Errors
+
+Remote failures are never silently skipped by `getAll()`:
+
+- **`GitHubRateLimitError`** (`code: 'GITHUB_RATE_LIMIT'`) — HTTP 429, or 403 with `x-ratelimit-remaining: 0`. Exposes `resetAt` and `limit`.
+- **`ContentSourceError`** — bad credentials (401), access denied (403), unknown repository or ref (404 on the tree), network errors, other HTTP errors. Exposes `status` and `source` (`github:<owner>/<repo>`).
+
+A missing file (404 on a raw read) is just `null`, like a missing file on disk.
+
+### Limitations
+
+- **Rate limits** — unauthenticated calls to `api.github.com` are limited to 60 requests per hour per IP, which CI runners share. The source makes one tree call per repository per cache window, but set `GITHUB_TOKEN` for builds anyway.
+- **Private repositories** — reading works with a token that has `contents: read`. Rewritten image URLs point to `raw.githubusercontent.com` and **won't load in visitors' browsers** for private repos; host images elsewhere or proxy them.
+- **Large repositories** — the tree API truncates beyond ~100,000 entries; a warning is logged and missing files are not listed.
+- **Dates** — no `lastModified` is derived from git history; ordering uses `frontmatter.date` when present, otherwise path order.
+- **MDX** — `.mdx` files are listed and returned as text like local files; `MarkdownContent` renders Markdown, not JSX.
+
+## Custom sources
+
+```ts
+import type { ContentSource } from '@next-md-blog/core';
+
+export interface ContentSource {
+  readonly name: string;                 // used in messages
+  readonly nested?: boolean;             // list() returns nested paths → slugs with '/'
+  readonly inferTitle?: boolean;         // derive title from H1 / file name
+  list(dir: string): Promise<string[]>;  // paths relative to dir ('' = root); [] if missing
+  read(path: string): Promise<string | null>;  // null if missing
+  transform?(content: string, ctx: { filePath: string; docHref(target: string): string | null }): string;
+}
+```
+
+Paths are `/`-separated and relative to the source root. The collection filters `list()` results to `.md` / `.mdx`, and `getOne(slug, { locale })` reads `<contentDir>/<locale>/<slug>.md` (then `.mdx`).

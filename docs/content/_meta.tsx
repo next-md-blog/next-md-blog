@@ -7,6 +7,7 @@ const meta: MetaRecord = {
   configuration: 'Configuration',
   'content-and-frontmatter': 'Content & frontmatter',
   internationalization: 'Internationalization',
+  'remote-sources': 'Remote sources (GitHub)',
   'api-reference': 'API reference',
   'seo-and-feeds': 'SEO & feeds',
   cli: 'CLI',

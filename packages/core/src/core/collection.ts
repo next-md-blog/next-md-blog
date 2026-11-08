@@ -8,8 +8,6 @@
 import type { Metadata } from 'next';
 import type { MetadataRoute } from 'next';
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
 import { parseFrontmatter } from './frontmatter.js';
 
 import type {
@@ -22,7 +20,7 @@ import type { SiteConfig } from './site.js';
 import { calculateReadingTime, calculateWordCount, normalizeAuthors } from './utils.js';
 import { validateContent, validateFrontmatter, validateSlug } from './validation.js';
 import {
-  BlogPostNotFoundError,
+  ContentSourceError,
   DirectoryError,
   FileReadError,
 } from './errors.js';
@@ -41,6 +39,9 @@ import {
   buildPublisherEmbedded,
   resolveOrganizationId,
 } from './organization-schema.js';
+import { fsSource } from './sources/fs.js';
+import { firstHeading, titleFromPath } from './sources/rewrite.js';
+import { joinSourcePath, type ContentSource } from './sources/types.js';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -91,8 +92,18 @@ export interface CollectionConfig<
 > {
   /** Stable identifier (used as cache key, in error messages). */
   id: string;
-  /** Filesystem directory relative to cwd (e.g. `content/blog`). */
-  contentDir: string;
+  /**
+   * Content directory (e.g. `content/blog`), relative to the source root.
+   * For the default filesystem source that is `process.cwd()`; for
+   * `githubSource` it is the source's `path` inside the repository.
+   * Required unless `source` is set (defaults to `''`, the source root).
+   */
+  contentDir?: string;
+  /**
+   * Where markdown is read from. Default: `fsSource()` (local filesystem).
+   * Use `githubSource({ owner, repo })` to read a directory of a GitHub repo.
+   */
+  source?: ContentSource;
   /** URL segment under `/{lang}` (e.g. `blog`). */
   pathSegment: string;
   /** Human-readable label (default: capitalized pathSegment). */
@@ -229,41 +240,43 @@ export interface Collection<
 // Helpers (private)
 // ---------------------------------------------------------------------------
 
-function readFileSafe(filePath: string): string | null {
-  try {
-    if (!fs.existsSync(filePath)) return null;
-    const stats = fs.statSync(filePath);
-    if (!stats.isFile()) return null;
-    return fs.readFileSync(filePath, 'utf8');
-  } catch (error) {
-    throw new FileReadError(
-      filePath,
-      error instanceof Error ? error : undefined,
-      { operation: 'readFileSafe' },
-    );
+/** Max concurrent `source.read()` calls in `getAll` (matters for remote sources). */
+const READ_CONCURRENCY = 8;
+
+async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const out = new Array<R>(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i]!);
+    }
   }
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, worker),
+  );
+  return out;
 }
 
-function readDirectorySafe(dirPath: string): string[] {
-  try {
-    if (!fs.existsSync(dirPath)) return [];
-    const stats = fs.statSync(dirPath);
-    if (!stats.isDirectory()) return [];
-    return fs.readdirSync(dirPath);
-  } catch (error) {
-    throw new DirectoryError(
-      dirPath,
-      error instanceof Error ? error : undefined,
-      { operation: 'readDirectorySafe' },
-    );
+/** Fill in `title` from the first H1 / file name when the source asks for it. */
+function withInferredTitle(
+  source: ContentSource,
+  frontmatter: BaseFrontmatter,
+  content: string,
+  filePath: string,
+): BaseFrontmatter {
+  if (!source.inferTitle) return frontmatter;
+  if (typeof frontmatter.title === 'string' && frontmatter.title.trim()) {
+    return frontmatter;
   }
-}
-
-function resolveDir(contentDir: string, locale?: string): string {
-  const base = path.isAbsolute(contentDir)
-    ? contentDir
-    : path.join(process.cwd(), contentDir);
-  return locale ? path.join(base, locale) : base;
+  return {
+    ...frontmatter,
+    title: firstHeading(content) ?? titleFromPath(filePath),
+  };
 }
 
 function slugify(value: string): string {
@@ -316,17 +329,25 @@ export function authorNamesFromFrontmatter(
 }
 
 function parseDoc<TFrontmatter extends BaseFrontmatter>(
+  fileContents: string,
   filePath: string,
   slug: string,
-  authors?: Author[],
+  authors: Author[] | undefined,
+  source: ContentSource,
+  transform?: (content: string) => string,
 ): ContentDoc<TFrontmatter> {
-  const fileContents = readFileSafe(filePath);
-  if (fileContents === null) throw new BlogPostNotFoundError(slug);
   try {
     const { data: frontmatter, content } = parseFrontmatter(fileContents);
     validateContent(content);
-    const trimmedContent = content.trim();
-    const validated = validateFrontmatter(frontmatter);
+    const trimmedContent = transform
+      ? transform(content.trim())
+      : content.trim();
+    const validated = withInferredTitle(
+      source,
+      validateFrontmatter(frontmatter),
+      content,
+      filePath,
+    );
     const readingTime =
       (validated.readingTime as number) || calculateReadingTime(trimmedContent);
     const wordCount = calculateWordCount(trimmedContent);
@@ -674,9 +695,17 @@ export function defineCollection<
           limit: input.rss?.limit ?? DEFAULT_RSS.limit,
         };
 
+  if (input.contentDir === undefined && !input.source) {
+    throw new Error(
+      `[${input.id}] defineCollection: \`contentDir\` is required unless a \`source\` is set`,
+    );
+  }
+  const source = input.source ?? fsSource();
+
   const config: ResolvedCollectionConfig<TFrontmatter> = {
     id: input.id,
-    contentDir: input.contentDir,
+    contentDir: input.contentDir ?? '',
+    source,
     pathSegment: input.pathSegment.replace(/^\/+|\/+$/g, ''),
     label,
     indexPath,
@@ -705,41 +734,65 @@ export function defineCollection<
     return `${base}${localeSeg}${idx}`;
   }
 
+  function localeDir(locale?: string): string {
+    return joinSourcePath(config.contentDir, locale);
+  }
+
+  function slugFromFile(file: string): string {
+    return file.replace(MARKDOWN_FILE_REGEX, '');
+  }
+
   async function getAll(
     opts: ReadOptions = {},
   ): Promise<ContentMetadata<TFrontmatter>[]> {
     try {
-      const dir = resolveDir(config.contentDir, opts.locale);
-      const files = readDirectorySafe(dir).filter((f) =>
+      const dir = localeDir(opts.locale);
+      const files = (await source.list(dir)).filter((f) =>
         MARKDOWN_FILE_REGEX.test(f),
       );
-      const docs: ContentMetadata<TFrontmatter>[] = [];
-      for (const file of files) {
-        try {
-          const slug = file.replace(MARKDOWN_FILE_REGEX, '');
-          const filePath = path.join(dir, file);
-          const fileContents = readFileSafe(filePath);
-          if (fileContents === null) continue;
-          const { data: frontmatter } = parseFrontmatter(fileContents);
-          const validated = validateFrontmatter(frontmatter);
-          const authors = normalizeAuthors(
-            validated.author as string | string[] | undefined,
-            validated.authors as string[] | undefined,
-            config.site.authors,
-          );
-          docs.push({
-            slug,
-            frontmatter: validated as unknown as TFrontmatter,
-            authors,
-          });
-        } catch (error) {
-          const errorMessage =
-            error instanceof Error ? error.message : 'Unknown error';
-          console.warn(
-            `[${config.id}] Skipping ${file}: ${errorMessage}`,
-          );
-        }
-      }
+      const parsed = await mapWithConcurrency(
+        files,
+        READ_CONCURRENCY,
+        async (file): Promise<ContentMetadata<TFrontmatter> | null> => {
+          try {
+            const slug = slugFromFile(file);
+            const filePath = joinSourcePath(dir, file);
+            const fileContents = await source.read(filePath);
+            if (fileContents === null) return null;
+            const { data: frontmatter, content } =
+              parseFrontmatter(fileContents);
+            const validated = withInferredTitle(
+              source,
+              validateFrontmatter(frontmatter),
+              content,
+              filePath,
+            );
+            const authors = normalizeAuthors(
+              validated.author as string | string[] | undefined,
+              validated.authors as string[] | undefined,
+              config.site.authors,
+            );
+            return {
+              slug,
+              frontmatter: validated as unknown as TFrontmatter,
+              authors,
+            };
+          } catch (error) {
+            // Remote failures (rate limit, auth, network) must surface instead
+            // of silently producing an empty or partial listing.
+            if (error instanceof ContentSourceError) throw error;
+            const errorMessage =
+              error instanceof Error ? error.message : 'Unknown error';
+            console.warn(
+              `[${config.id}] Skipping ${file}: ${errorMessage}`,
+            );
+            return null;
+          }
+        },
+      );
+      const docs = parsed.filter(
+        (d): d is ContentMetadata<TFrontmatter> => d !== null,
+      );
       return docs.sort((a, b) => {
         const da = (a.frontmatter.date as string) || '';
         const db = (b.frontmatter.date as string) || '';
@@ -755,26 +808,39 @@ export function defineCollection<
     slug: string,
     opts: ReadOptions = {},
   ): Promise<ContentDoc<TFrontmatter> | null> {
-    try {
-      validateSlug(slug);
-      const dir = resolveDir(config.contentDir, opts.locale);
-      for (const ext of SUPPORTED_EXTENSIONS) {
-        const filePath = path.join(dir, `${slug}${ext}`);
-        const fileContents = readFileSafe(filePath);
-        if (fileContents !== null) {
-          return parseDoc<TFrontmatter>(filePath, slug, config.site.authors);
-        }
-      }
-      return null;
-    } catch (error) {
-      if (
-        error instanceof BlogPostNotFoundError ||
-        error instanceof FileReadError
-      ) {
-        throw error;
-      }
-      throw error;
+    validateSlug(slug, { allowNested: source.nested === true });
+    const dir = localeDir(opts.locale);
+    for (const ext of SUPPORTED_EXTENSIONS) {
+      const filePath = joinSourcePath(dir, `${slug}${ext}`);
+      const fileContents = await source.read(filePath);
+      if (fileContents === null) continue;
+      const transform = source.transform
+        ? (content: string) =>
+            source.transform!(content, {
+              filePath,
+              docHref: (target) => docHref(target, opts.locale),
+            })
+        : undefined;
+      return parseDoc<TFrontmatter>(
+        fileContents,
+        filePath,
+        slug,
+        config.site.authors,
+        source,
+        transform,
+      );
     }
+    return null;
+  }
+
+  /** Site URL of the collection document at `target` (source-relative), if any. */
+  function docHref(target: string, locale?: string): string | null {
+    const dir = localeDir(locale);
+    if (dir && !target.startsWith(`${dir}/`)) return null;
+    const rel = dir ? target.slice(dir.length + 1) : target;
+    if (!MARKDOWN_FILE_REGEX.test(rel)) return null;
+    if (rel.includes('/') && !source.nested) return null;
+    return buildUrl(slugFromFile(rel), locale);
   }
 
   async function getAllSlugs(opts: ReadOptions = {}): Promise<string[]> {

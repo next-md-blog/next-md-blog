@@ -5,7 +5,7 @@ description: Build a multilingual (i18n) Markdown blog in Next.js — locale sub
 
 # Internationalization
 
-A `Collection` reads from `${contentDir}/${locale}/` whenever `opts.locale` is set. This makes it trivial to ship per-locale posts under the same `defineCollection({...})` instance.
+A `Collection` reads from `${contentDir}/${locale}/` whenever `opts.locale` is set (also for [remote sources](/remote-sources#locales), relative to the source root). This makes it trivial to ship per-locale posts under the same `defineCollection({...})` instance.
 
 ```text
 content/
