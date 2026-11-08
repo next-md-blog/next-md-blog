@@ -76,7 +76,8 @@ export const glossary = defineCollection({
 | Field | Purpose | Default |
 |---|---|---|
 | `id` | Stable identifier (cache key, log messages) | required |
-| `contentDir` | Filesystem folder, relative to cwd | required |
+| `contentDir` | Content folder, relative to the source root (cwd for the filesystem) | required unless `source` is set |
+| `source` | Where Markdown is read from — `fsSource()` or [`githubSource()`](/remote-sources) | `fsSource()` |
 | `pathSegment` | URL segment under `/{lang}` | required |
 | `site` | Shared `SiteConfig` | required |
 | `label` | Human label (breadcrumbs, RSS title fallback) | capitalized `pathSegment` |

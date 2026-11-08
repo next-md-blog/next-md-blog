@@ -6,7 +6,10 @@ import type { BlogPostFrontmatter } from './types';
  * @returns True if valid, throws error if invalid
  * @throws {Error} If slug is invalid
  */
-export function validateSlug(slug: string): boolean {
+export function validateSlug(
+  slug: string,
+  options: { allowNested?: boolean } = {},
+): boolean {
   if (!slug || typeof slug !== 'string') {
     throw new Error('Slug must be a non-empty string');
   }
@@ -15,8 +18,18 @@ export function validateSlug(slug: string): boolean {
     throw new Error('Slug cannot be empty or whitespace');
   }
 
-  // Prevent directory traversal and invalid characters
-  if (slug.includes('..') || slug.includes('/') || slug.includes('\\')) {
+  // Nested slugs (`guides/install`) are allowed only for sources that list
+  // nested directories; each segment must still be a plain path segment.
+  if (options.allowNested && slug.includes('/')) {
+    const segments = slug.split('/');
+    if (
+      slug.includes('\\') ||
+      segments.some((s) => s.length === 0 || s === '.' || s === '..')
+    ) {
+      throw new Error('Slug cannot contain path separators or directory traversal sequences');
+    }
+  } else if (slug.includes('..') || slug.includes('/') || slug.includes('\\')) {
+    // Prevent directory traversal and invalid characters
     throw new Error('Slug cannot contain path separators or directory traversal sequences');
   }
 

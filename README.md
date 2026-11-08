@@ -15,6 +15,7 @@ A React library for parsing and displaying **Markdown** and **MDX** blog posts i
 - **TypeScript** — Typed config, posts, and frontmatter
 - **CLI** — `npx @next-md-blog/cli` for posts folder, sample post, config, blog routes, **sitemap.ts / robots.ts / feed.xml** (under `app/` or `src/app/`); **`npx @next-md-blog/cli seo`** to add or update SEO routes only; **`--force`** to overwrite
 - **i18n-friendly** — Locale-specific post folders and `locale` option on loaders (see docs)
+- **Remote sources** — Render Markdown from GitHub repositories (e.g. each repo's `docs/`) with `githubSource`, or plug in your own `ContentSource`
 
 ## Installation
 
@@ -235,6 +236,37 @@ const post = await blog.getOne('welcome', { locale: 'en' });
 ```
 
 Custom **`remarkPlugins`** / **`rehypePlugins`** on **`MarkdownContent`** are supported; use trusted plugins only—see the [API reference](https://www.next-md-blog.com/api-reference).
+
+## Remote sources (GitHub)
+
+Collections read the local filesystem by default. Pass a `source` to render Markdown that lives in other repositories — for example each component repo's `docs/` folder:
+
+```ts
+import { defineCollection, githubSource, type Collection } from '@next-md-blog/core';
+
+export const repoDocs: Record<string, Collection> = Object.fromEntries(
+  ['edr-agent', 'edr-server'].map((repo) => [
+    repo,
+    defineCollection({
+      id: `${repo}-docs`,
+      pathSegment: `docs/${repo}`,
+      rss: false,
+      site,
+      source: githubSource({
+        owner: 'synthaea-lab',
+        repo,
+        path: 'docs',      // default
+        revalidate: 3600,  // Next.js fetch cache + in-memory TTL
+        // token defaults to process.env.GITHUB_TOKEN
+      }),
+    }),
+  ]),
+);
+
+const doc = await repoDocs['edr-agent'].getOne('guides/install');
+```
+
+One tree API call lists each repository; bodies come from `raw.githubusercontent.com`. Frontmatter is optional (title falls back to the first `# H1` or the file name), nested folders become slugs like `guides/install` (use a `[...slug]` route), relative images point to raw GitHub URLs and links to sibling docs point to the collection's own route. Rate limits raise a typed `GitHubRateLimitError`. See **[Remote sources](https://www.next-md-blog.com/remote-sources)**.
 
 ## Contributing
 
