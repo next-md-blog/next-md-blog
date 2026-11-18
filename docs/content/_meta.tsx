@@ -13,7 +13,7 @@ const meta: MetaRecord = {
   cli: 'CLI',
   demos: 'Demos',
   deployment: 'Deployment',
-  testing: 'Testing & contributing',
+  testing: 'Testing (pnpm test & typecheck)',
 };
 
 export default meta;
