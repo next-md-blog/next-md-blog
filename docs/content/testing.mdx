@@ -29,7 +29,7 @@ pnpm does not pick a test runner for you. In this repository, each library packa
 
 `typecheck` is **not** a pnpm command. pnpm treats `pnpm typecheck` as shorthand for `pnpm run typecheck`. The [pnpm run docs](https://pnpm.io/cli/run) say this shorthand works for any script whose name is not already a built-in pnpm command. If there is no `typecheck` script, the command fails.
 
-The usual definition, and the one every package here uses, is:
+The usual definition, and the one `packages/core`, `packages/cli` and `docs/` use, is:
 
 ```json
 {
@@ -59,7 +59,7 @@ What each flag does, from the pnpm docs:
 
 - **`-r` / `--recursive`**: run the script in every selected workspace package, excluding the workspace root. Packages that don't define the script are skipped.
 - **`--filter './packages/*'`**: select packages by directory glob ([filtering](https://pnpm.io/filtering)). Repeating `--filter` adds more selections, so this picks `packages/core`, `packages/cli` and `docs/` and leaves out the demo apps.
-- **`--if-present`**: don't exit with an error when the script is not defined. The docs app has no `test` script, so the test run simply passes over it.
+- **`--if-present`**: don't exit with an error when the script is not defined. With `-r`, pnpm already skips packages that lack the script (here, the docs app has no `test` script); the flag also stops the run from failing if none of the selected packages define it.
 
 The one-off equivalents, without root scripts:
 
