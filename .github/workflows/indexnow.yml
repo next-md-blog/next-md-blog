@@ -1,0 +1,42 @@
+name: IndexNow
+
+# Notify IndexNow (Bing, Yandex, Seznam, Naver...) after the docs site is live.
+# Vercel reports each production deployment back to GitHub; we only act on a
+# successful one for the docs project, so URLs are submitted once they serve
+# the new content.
+on:
+  deployment_status:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  submit:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.deployment_status.state == 'success' &&
+       github.event.deployment.environment == 'Production – next-md-blog-docs')
+    runs-on: ubuntu-latest
+    env:
+      HOST: www.next-md-blog.com
+      KEY: 2cce804be0774625cd61744942ed98bd
+    steps:
+      - name: Check key file is served
+        run: |
+          served=$(curl -fsSL "https://$HOST/$KEY.txt")
+          test "$served" = "$KEY"
+
+      - name: Submit sitemap URLs
+        run: |
+          curl -fsSL "https://$HOST/sitemap.xml" \
+            | grep -oE '<loc>[^<]+</loc>' | sed -E 's#</?loc>##g' > urls.txt
+          echo "Submitting $(wc -l < urls.txt) URLs"
+          jq -Rn --arg host "$HOST" --arg key "$KEY" \
+            '{host: $host, key: $key, keyLocation: "https://\($host)/\($key).txt", urlList: [inputs]}' \
+            urls.txt > payload.json
+          status=$(curl -sS -o response.txt -w '%{http_code}' \
+            -H 'Content-Type: application/json; charset=utf-8' \
+            --data @payload.json https://api.indexnow.org/indexnow)
+          echo "IndexNow HTTP $status"; cat response.txt
+          case "$status" in 200|202) ;; *) exit 1 ;; esac

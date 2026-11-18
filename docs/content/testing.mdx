@@ -1,62 +1,130 @@
 ---
-title: Testing & contributing
-description: Run Vitest in the monorepo and contribute to next-md-blog.
+title: pnpm test and pnpm typecheck in a monorepo
+description: What pnpm test and pnpm typecheck actually run, how to run them across a pnpm workspace with -r and --filter, and the exact scripts next-md-blog uses in CI.
 ---
 
-# Testing & contributing
+# pnpm test and pnpm typecheck in a monorepo
 
-## Full CI-style check
+This page explains what **`pnpm test`** and **`pnpm typecheck`** do, using the next-md-blog repository as a worked example: a pnpm workspace with two Vitest packages, a Nextra docs site and two demo apps. The same patterns apply to any pnpm monorepo.
 
-From the **repository root** (same steps as [GitHub Actions CI](https://github.com/next-md-blog/next-md-blog/blob/main/.github/workflows/ci.yml)):
+## What `pnpm test` runs
+
+`pnpm test` is a built-in pnpm command. Per the [pnpm docs](https://pnpm.io/cli/test), it is the same as `pnpm run test`: it runs whatever command is in the **`test`** field of the current package's `scripts`. The aliases `pnpm t` and `pnpm tst` do the same thing.
+
+pnpm does not pick a test runner for you. In this repository, each library package defines:
+
+```json filename="packages/core/package.json"
+{
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  }
+}
+```
+
+`vitest run` runs the suite once and exits, which is what you want in CI. Plain `vitest` starts watch mode.
+
+## What `pnpm typecheck` runs
+
+`typecheck` is **not** a pnpm command. pnpm treats `pnpm typecheck` as shorthand for `pnpm run typecheck`. The [pnpm run docs](https://pnpm.io/cli/run) say this shorthand works for any script whose name is not already a built-in pnpm command. If there is no `typecheck` script, the command fails.
+
+The usual definition, and the one every package here uses, is:
+
+```json
+{
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}
+```
+
+`tsc --noEmit` runs the TypeScript compiler against the package's `tsconfig.json` and reports type errors without writing any output files. It is faster than a full build, and it catches errors that tools which only strip types, such as Vitest or a dev server, never report.
+
+## Running scripts across the workspace
+
+At the root of a workspace, `pnpm test` only runs the **root** `package.json`'s `test` script. To reach the packages you either call pnpm recursively or define root scripts that do. next-md-blog does the second:
+
+```json filename="package.json (repository root)"
+{
+  "scripts": {
+    "test": "pnpm --filter './packages/*' --filter './docs' -r run --if-present test",
+    "typecheck": "pnpm --filter './packages/*' --filter './docs' -r run typecheck",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+  }
+}
+```
+
+What each flag does, from the pnpm docs:
+
+- **`-r` / `--recursive`**: run the script in every selected workspace package, excluding the workspace root. Packages that don't define the script are skipped.
+- **`--filter './packages/*'`**: select packages by directory glob ([filtering](https://pnpm.io/filtering)). Repeating `--filter` adds more selections, so this picks `packages/core`, `packages/cli` and `docs/` and leaves out the demo apps.
+- **`--if-present`**: don't exit with an error when the script is not defined. The docs app has no `test` script, so the test run simply passes over it.
+
+The one-off equivalents, without root scripts:
+
+```bash
+pnpm -r test                                   # every workspace package (not the root) that has a test script
+pnpm -r run typecheck                          # same for typecheck
+pnpm --filter @next-md-blog/core test          # one package, selected by name
+pnpm --filter "./packages/**" run typecheck    # everything under packages/
+```
+
+## Run the next-md-blog checks locally
+
+Clone the repository and install from the root. `pnpm install` also runs the root `prepare` script, which builds `packages/*` (not `docs/` or the demos).
 
 ```bash
 git clone https://github.com/next-md-blog/next-md-blog.git
 cd next-md-blog
-pnpm install --frozen-lockfile   # optional; use pnpm install locally
-pnpm check    # lint + typecheck + test + pnpm build
-```
-
-**`pnpm check`** is the single gate before a PR: it runs **`pnpm lint`**, **`pnpm typecheck`**, **`pnpm test`**, then **`pnpm build`**.
-
-## Running tests
-
-```bash
 pnpm install
-pnpm test
 ```
 
-**`pnpm test`** runs **Vitest** in **`packages/core`** and **`packages/cli`** only. The docs app has no `test` script. Integration tests in **`packages/cli`** use a minimal Next.js fixture; **`packages/core`** has broader unit coverage.
-
-Target one package:
+Then:
 
 ```bash
-pnpm test:core
-pnpm test:cli
+pnpm test           # Vitest in packages/core and packages/cli
+pnpm typecheck      # tsc --noEmit in packages/core, packages/cli and docs/
+pnpm lint           # ESLint for the packages, docs/ and both demo apps
+pnpm check          # lint + typecheck + test + build, the full gate before a PR
 ```
 
-Watch mode and coverage (where configured):
+Run a single package, or a subset of test files:
+
+```bash
+pnpm test:core      # = pnpm --filter @next-md-blog/core run test
+pnpm test:cli       # = pnpm --filter @next-md-blog/cli run test
+pnpm --filter @next-md-blog/core exec vitest run frontmatter   # only files matching "frontmatter"
+```
+
+Watch mode and coverage (V8 provider via `@vitest/coverage-v8`):
 
 ```bash
 pnpm test:watch
 pnpm test:coverage
 ```
 
-## Lint and typecheck
+### What is covered
 
-- **`pnpm lint`** — ESLint on **`packages/cli`**, **`packages/core`**, **`docs/`**, and both **demo** apps (`demos/single`, `demos/i18n`).
-- **`pnpm typecheck`** — **`tsc --noEmit`** for **`packages/*`** and **`docs/`** only. Demos are type-checked as part of their **Next.js production build** in **`pnpm build`**, not as a separate workspace `typecheck` task.
+- **`packages/core`**: unit tests under `src/core/__tests__/` for collections, frontmatter parsing, content sources, validation and helpers.
+- **`packages/cli`**: unit tests plus an integration test that copies a minimal Next.js fixture into a temp directory and runs the same init steps as the real CLI.
+- **`docs/`**: no test suite. It is checked by `pnpm typecheck` and by its production build (`pnpm build:docs`).
+- **Demo apps**: not part of `pnpm typecheck`. Next.js type-checks them during their production build, which `pnpm build` runs.
 
-## Building the monorepo
+## Same steps in CI
 
-Root **`pnpm install`** runs **`prepare`**, which builds **`packages/*`** but **not** **`docs/`** or demos (keeps installs fast).
-
-- **`pnpm build`** — builds **`packages/*`**, **`docs/`**, and **both demo apps** (matches CI).
-- **`pnpm build:docs`** — documentation site only.
+The [GitHub Actions workflow](https://github.com/next-md-blog/next-md-blog/blob/main/.github/workflows/ci.yml) runs these steps on every pull request:
 
 ```bash
-pnpm run build
+pnpm install --frozen-lockfile
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
 ```
+
+`--frozen-lockfile` makes the install fail if `pnpm-lock.yaml` is out of date instead of rewriting it, so CI tests exactly the dependencies that were committed.
 
 ## Contributing
 
-Guidelines and workflow: **[`.github/CONTRIBUTING.md`](https://github.com/next-md-blog/next-md-blog/blob/main/.github/CONTRIBUTING.md)** in the GitHub repository. Prefer focused PRs that match existing style in **`packages/core`** and **`packages/cli`**.
+Read [`.github/CONTRIBUTING.md`](https://github.com/next-md-blog/next-md-blog/blob/main/.github/CONTRIBUTING.md) for the workflow. Run `pnpm check` before opening a pull request, and keep PRs focused and consistent with the existing style in `packages/core` and `packages/cli`.
