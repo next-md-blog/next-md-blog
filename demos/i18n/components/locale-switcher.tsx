@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Globe } from 'lucide-react';
+import { track } from '@vercel/analytics';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,6 +51,13 @@ export function LocaleSwitcher({ currentLocale }: { currentLocale?: string }) {
           <DropdownMenuItem key={locale.code} asChild>
             <Link
               href={getLocalePath(locale.code)}
+              onClick={() => {
+                try {
+                  track('language_switch', { to: locale.code });
+                } catch {
+                  /* analytics must never break the page */
+                }
+              }}
               className={`flex items-center w-full ${
                 activeLocale === locale.code ? 'bg-accent' : ''
               }`}
