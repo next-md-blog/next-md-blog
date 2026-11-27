@@ -139,11 +139,6 @@ export default async function RootLayout({
         </Layout>
         <Analytics />
         <AutoEvents />
-        <script
-          src="https://analytics.ahrefs.com/analytics.js"
-          data-key="5zrwVqVGDgnaYUDWu2Hp0Q"
-          async
-        />
       </body>
     </html>
   );
